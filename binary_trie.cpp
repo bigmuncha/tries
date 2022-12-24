@@ -4,10 +4,13 @@
 #include <unordered_map>
 #include <optional>
 #include <vector>
+#include "helpers/logger.h"
+
 #define BIT_OFFSET 1
 #define COMPLETE_FLAG 2
 #define FIRST_BYTE_OFFSET 31
 //#define ROOT_FLAG 3
+
 #define CHECK_BIT(num, bit)  ((num) & (bit))
 
 using next_hop_table =     std::unordered_map<uint32_t, uint32_t>;
@@ -52,7 +55,7 @@ public:
 	    std::cout << (bool)f_node->bit <<"";
 	    if((f_node = next_node(f_node,FIRST_BYTE_OFFSET-i, next_hop )))
 	    {
-		std::cout << "Dont make node\n ";
+//		LLOG_DEBUG() << "Dont make node";
 		parent = f_node;
 		i++;
 		size--;
@@ -60,7 +63,7 @@ public:
 	    }
 	    else
 	    {
-		std::cout << "Make node\n ";
+//		LLOG_DEBUG() << "Make node ";
 		if(CHECK_BIT(next_hop, 1 << (FIRST_BYTE_OFFSET - i))){
 		    parent->right = new node{1,nullptr,nullptr, {}};
 		    f_node = parent = parent->right;
@@ -76,62 +79,62 @@ public:
 	std::cout << "\n ";
 	if(f_node->next_hops.contains(next_hop))
 	{
-	    std::cout << "Already contains\n ";
+	    LLOG_DEBUG() << "Already contains";
 	    return false;
 	}
 	else
 	{
-	    std::cout << "MAKE INSERT\n ";
+	    LLOG_DEBUG() << "MAKE INSERT";
 	    f_node->subnet = mask & next_hop;
 	    f_node->next_hops[next_hop] = interface;
-	    std::cout << "      Subnet:        "<< std::bitset<32>(mask &next_hop ) << '\n';
-	    std::cout << "      nexthop:        "<< std::bitset<32>(next_hop) << " IFace:" << interface << '\n';
+	    LLOG_DEBUG() << "      Subnet:        "<< std::bitset<32>(mask &next_hop ) << '\n';
+	    LLOG_DEBUG() << "      nexthop:       "<< std::bitset<32>(next_hop) << " IFace:" << interface << '\n';
 	    return true;
 	}
     }
     std::optional<next_hop_table> lookup(uint32_t dst_ip)
     {
-	std::cout <<"\n   Try loojup         " << std::bitset<32>(dst_ip) <<'\n';
+	//LLOG_DEBUG() <<"\n   Try loojup";
 	node* f_node = first_node(dst_ip >> FIRST_BYTE_OFFSET);
 	node* parent = f_node;
 	next_hop_table result;
 	int i = 1;
 	if(!f_node)
 	{
-	    std::cout <<"ERROR";
+	    LLOG_INFO() <<"ERROR";
 	}
 	if(result.empty())
 	{
-	    std::cout <<"ERROR\n";
+	    LLOG_INFO() << "ERROR";
 	}
-	std::cout << "   Lookup Bit path:   ";
+	LLOG_DEBUG() << "   Lookup Bit path:   ";
 	while(f_node)
 	{
 	    std::cout << (bool)f_node->bit <<"";
 	    if((f_node = next_node(f_node, FIRST_BYTE_OFFSET - i, dst_ip)))
 	    {
-		std::cout <<"FIRST DEP " << (bool)f_node->bit << " "; 
+		//LLOG_DEBUG() <<"FIRST DEP " << (bool)f_node->bit << " ";
 		if(!f_node->next_hops.empty())
 		{
-		    std::cout <<"FOUND \n";
+		    //  LLOG_DEBUG() <<"FOUND";
 		    result = f_node->next_hops;
 		}
-		std::cout <<"NEXT \n";
+//		LLOG_DEBUG() <<"NEXT";
 		parent = f_node;
 		i++;
 		continue;
 	    }
 	    i++;
-	    std::cout <<"NNEXT \n";
+//	    LLOG_DEBUG() <<"NNEXT ";
 	}
 	if(result.empty())
 	{
-	    std::cout <<"empty result \n";
+	    LLOG_INFO() <<"empty result ";
 	    return {};
 	}
 	else
 	{
-	    std::cout <<"nonempty \n";
+	    LLOG_INFO() <<"nonempty ";
 	    return result;
 	}
     }
@@ -141,7 +144,7 @@ public:
 	node* f_node1 = root_.left;
 	node* f_node2 = root_.right;
 	std::vector<node*> collector;
-	std::cout << "Try print values\n";
+	LLOG_DEBUG() << "Try print values";
 	auto foo = [&](auto && foo, node* nd)
 	    {
 		if(!nd)
@@ -178,6 +181,7 @@ private:
 
 int main ()
 {
+//    LLOG_DEBUG() << "OGOR";
     static constexpr uint32_t omar = 0xffffffff;
     static constexpr uint32_t said = 0xabcdef11;
     static constexpr uint8_t oleg  = 1 << 2;
@@ -203,6 +207,9 @@ int main ()
     trie.PrintValues();
     std::cout << trie.insert(0xffff1122,0xffffff00, 12) << '\n';
     std::cout << trie.insert(0xffff3333,0xffffff00, 15) << '\n';
+    std::cout << trie.insert(0xffff1144,0xffffff00, 18) << '\n';
     std::cout << trie.lookup(0xffff1122).has_value() << '\n';
     trie.PrintValues();
+    LLOG_DEBUG() << "OLEG";
+    std::cout <<getLogLevel() << '\n';
 }
