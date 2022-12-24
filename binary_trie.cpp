@@ -48,7 +48,7 @@ public:
 	std::cout <<"\n   Try Insert nexthop " << IPv4::printnum(next_hop) <<'\n';
 	node* parent = f_node;
 	int i = 1;
-	auto size  = __builtin_popcount(mask);
+	auto size  = __builtin_popcount(mask) -1;
 	std::stringstream ss;
 	ss << "   Insert Bit path:   ";
 	while(size)
@@ -56,7 +56,7 @@ public:
 	    ss << (bool)f_node->bit <<"";
 	    if((f_node = next_node(f_node,FIRST_BYTE_OFFSET-i, next_hop )))
 	    {
-//		LLOG_DEBUG() << "Dont make node";
+		LLOG_DEBUG() << "Dont make node";
 		parent = f_node;
 		i++;
 		size--;
@@ -64,14 +64,15 @@ public:
 	    }
 	    else
 	    {
-//		LLOG_DEBUG() << "Make node ";
 		if(CHECK_BIT(next_hop, 1 << (FIRST_BYTE_OFFSET - i))){
 		    parent->right = new node{1,nullptr,nullptr, {}};
 		    f_node = parent = parent->right;
+		    LLOG_DEBUG() << "Make node 1 " << i <<" "<< size;
 		}
 		else{
 		    parent->left  = new node{0,nullptr,nullptr, {}};
 		    f_node = parent = parent->left;
+		    LLOG_DEBUG() << "Make node 0 " << i<<" " << size;
 		}
 	    }
 	    i++;
@@ -115,10 +116,9 @@ public:
 		//LLOG_DEBUG() <<"FIRST DEP " << (bool)f_node->bit << " ";
 		if(!f_node->next_hops.empty())
 		{
-		    std::cout << " REMEMER " << f_node << " " << parent;
+		    std::cout << " REMEMER " << f_node << " " << parent << " "<< i << " ";
 		    //  LLOG_DEBUG() <<"FOUND";
 		    result = f_node->next_hops;
-		    
 		}
 //		LLOG_DEBUG() <<"NEXT";
 		parent = f_node;
@@ -129,10 +129,10 @@ public:
 
 //	    LLOG_DEBUG() <<"NNEXT ";
 	}
-	std::cout <<" ";
+	std::cout <<"\n";
 	if(result.empty())
 	{
-	    std::cout << "BAD " << std::bitset<32>(FIRST_BYTE_OFFSET -i) << '\n';
+	    std::cout << "BAD " << f_node << " " << parent << " "<< i << " " << '\n';
 	    LLOG_INFO() <<"empty result " << i << " " << (bool)parent->bit << " " << parent;
 	    return {};
 	}
@@ -262,7 +262,7 @@ int main ()
 	arr[3] = 1;
 	arr[2]++;
     }
-    IPv4 num(0xffffccdd);
+    IPv4 num(1);
     IPv4 bum(std::array<uint8_t,4>{0xff, 0xff,0xcc,0xdd});
     IPv4 sum(0xff, 0xff, 0xcc, 0xdd);
     std::cout <<'\n';
@@ -270,8 +270,8 @@ int main ()
     std::cout << bum.getWithDots() << " " <<bum.getWithoutDots() << '\n';
     std::cout << sum.getWithDots() << " " <<sum.getWithoutDots() << '\n';
     uint32_t oamr = reinterpret_cast<uint32_t&>(num);
-    std::cout<<IPv4::printnumWithDots(oamr << 9) <<" " << IPv4::printnum(oamr << 8) << '\n';
-    show_nets();
+    std::cout<<IPv4::printnumWithDots(1 <<8) <<" " << IPv4::printnum(oamr << (31-24)) << '\n';
+    //show_nets();
     //    trie.PrintValues();
 
 }
