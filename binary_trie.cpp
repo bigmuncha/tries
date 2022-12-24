@@ -5,7 +5,7 @@
 #include <optional>
 #include <vector>
 #include "helpers/logger.h"
-
+#include "helpers/ipcreator.h"
 #define BIT_OFFSET 1
 #define COMPLETE_FLAG 2
 #define FIRST_BYTE_OFFSET 31
@@ -103,10 +103,6 @@ public:
 	{
 	    LLOG_INFO() <<"ERROR";
 	}
-	if(result.empty())
-	{
-	    LLOG_INFO() << "ERROR";
-	}
 	LLOG_DEBUG() << "   Lookup Bit path:   ";
 	while(f_node)
 	{
@@ -181,35 +177,67 @@ private:
 
 int main ()
 {
-//    LLOG_DEBUG() << "OGOR";
-    static constexpr uint32_t omar = 0xffffffff;
-    static constexpr uint32_t said = 0xabcdef11;
-    static constexpr uint8_t oleg  = 1 << 2;
-    static constexpr uint8_t oid  = 2 | 1;
-//    static constexpr uint32_t osid  =  1 >>(omar << (10 -1));
-    static constexpr size_t sss = __builtin_popcount(0xffffffff << 10);
-    std::cout <<sss << "\n";
-    std::cout <<std::bitset<32>(1 << 4)  << "\n";
-    std::cout <<std::bitset<32>(said)  << "\n";
-    std::cout <<std::bitset<32>(~said)  << "\n";
-    std::cout <<(said & (1 << 4))  << "\n";
-    std::cout <<(~said & (1 << 4))  << "\n";
-    std::cout <<std::bitset<32>(1<< 10 )  << "\n";
-    std::cout <<std::bitset<32>(said << 10 )  << "\n";
-    std::cout <<std::bitset<32>(said  &(said << 10))  << "\n";
-    std::cout <<std::bitset<32>(said) << "\n";
-    std::cout <<std::bitset<8>(oid) << "\n";
-    //  std::cout <<std::bitset<8>(osid) << "\n";
-    std::cout << (oleg & oid) << "\n";
-    std::cout << "\n\n";
-    Btrie trie;
-    std::cout << trie.lookup(0xffff1122).has_value() << '\n';
-    trie.PrintValues();
-    std::cout << trie.insert(0xffff1122,0xffffff00, 12) << '\n';
-    std::cout << trie.insert(0xffff3333,0xffffff00, 15) << '\n';
-    std::cout << trie.insert(0xffff1144,0xffffff00, 18) << '\n';
-    std::cout << trie.lookup(0xffff1122).has_value() << '\n';
-    trie.PrintValues();
+/* //    LLOG_DEBUG() << "OGOR"; */
+/*     static constexpr uint32_t omar = 0xffffffff; */
+/*     static constexpr uint32_t said = 0xabcdef11; */
+/*     static constexpr uint8_t oleg  = 1 << 2; */
+/*     static constexpr uint8_t oid  = 2 | 1; */
+/* //    static constexpr uint32_t osid  =  1 >>(omar << (10 -1)); */
+/*     static constexpr size_t sss = __builtin_popcount(0xffffffff << 10); */
+/*     std::cout <<sss << "\n"; */
+/*     std::cout <<std::bitset<32>(1 << 4)  << "\n"; */
+/*     std::cout <<std::bitset<32>(said)  << "\n"; */
+/*     std::cout <<std::bitset<32>(~said)  << "\n"; */
+/*     std::cout <<(said & (1 << 4))  << "\n"; */
+/*     std::cout <<(~said & (1 << 4))  << "\n"; */
+/*     std::cout <<std::bitset<32>(1<< 10 )  << "\n"; */
+/*     std::cout <<std::bitset<32>(said << 10 )  << "\n"; */
+/*     std::cout <<std::bitset<32>(said  &(said << 10))  << "\n"; */
+/*     std::cout <<std::bitset<32>(said) << "\n"; */
+/*     std::cout <<std::bitset<8>(oid) << "\n"; */
+/*     //  std::cout <<std::bitset<8>(osid) << "\n"; */
+/*     std::cout << (oleg & oid) << "\n"; */
+/*     std::cout << "\n\n"; */
+     Btrie trie; 
+/*     std::cout << trie.lookup(0xffff1122).has_value() << '\n'; */
+/*     trie.PrintValues(); */
+/*     std::cout << trie.insert(0xffff1122,0xffffff00, 12) << '\n'; */
+/*     std::cout << trie.insert(0xffff3333,0xffffff00, 15) << '\n'; */
+/*     std::cout << trie.insert(0xffff1144,0xffffff00, 18) << '\n'; */
+/*     std::cout << trie.lookup(0xffff1122).has_value() << '\n'; */
+//    trie.PrintValues();
     LLOG_DEBUG() << "OLEG";
-    std::cout <<getLogLevel() << '\n';
+    /* std::cout <<getLogLevel() << '\n'; */
+
+    /* uint32_t subnet= 0xffff3322; */
+    /* std::array<uint8_t,4> net{0xff, 0xff, 0x1,0x1}; */
+    /* for(int i = 0; i < 256; i++ ) */
+    /* { */
+    /* 	if(!trie.insert(subnet++,0xffffff00,i)) */
+    /* 	{ */
+    /* 	    LLOG_ERROR() << "ERROR OCUR " << i; */
+    /* 	    throw std::exception(); */
+    /* 	} */
+    /* } */
+    /* uint32_t other_subnet  = 0x19232224; */
+    /* for(int i = 0; i< 500; i++) */
+    /* { */
+    /* 	if(!trie.lookup(other_subnet)) */
+    /* 	{ */
+    /* 	    LLOG_ERROR() << "ERROR OCUR " << i; */
+    /* 	    throw std::exception(); */
+    /* 	} */
+    /* } */
+    IPv4 num(0xffffccdd);
+    IPv4 bum(std::array<uint8_t,4>{0xff, 0xff,0xcc,0xdd});
+    IPv4 sum(0xff, 0xff, 0xcc, 0xdd);
+    std::cout <<'\n';
+    std::cout << num.getWithDots() << " " <<num.getWithoutDots() << '\n';
+    std::cout << bum.getWithDots() << " " <<bum.getWithoutDots() << '\n';
+    std::cout << sum.getWithDots() << " " <<sum.getWithoutDots() << '\n';
+    uint32_t oamr = reinterpret_cast<uint32_t&>(num);
+    std::cout<<IPv4::printnumWithDots(oamr << 9) <<" " << IPv4::printnum(oamr << 8) << '\n';
+    show_nets();
+    //    trie.PrintValues();
+
 }
