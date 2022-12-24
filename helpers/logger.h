@@ -1,3 +1,4 @@
+#pragma once
 #include <experimental/source_location>
 #include <string_view>
 #include <sstream>
