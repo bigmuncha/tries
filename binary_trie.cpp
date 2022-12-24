@@ -26,7 +26,7 @@ public:
     node* next_node(node* current, uint8_t current_bit, uint32_t next_hop)
 	{
 
-	    if(current->bit == (next_hop & (1 <<current_bit)))
+	    if(next_hop & (1 <<current_bit))
 	    {
 		return current->right;
 	    }
@@ -41,19 +41,26 @@ public:
 	}
     bool insert(uint32_t next_hop, uint32_t mask, uint32_t interface)
     {
-	node* f_node = first_node(next_hop << FIRST_BYTE_OFFSET);
+	node* f_node = first_node(next_hop >> FIRST_BYTE_OFFSET);
+	std::cout <<"\n   Try Insert nexthop " << std::bitset<32>(next_hop) <<'\n';
 	node* parent = f_node;
 	int i = 1;
 	auto size  = __builtin_popcount(mask);
+	std::cout << "   Insert Bit path:   ";
 	while(size)
 	{
+	    std::cout << (bool)f_node->bit <<"";
 	    if((f_node = next_node(f_node,FIRST_BYTE_OFFSET-i, next_hop )))
 	    {
+		std::cout << "Dont make node\n ";
 		parent = f_node;
+		i++;
+		size--;
 		continue;
 	    }
 	    else
 	    {
+		std::cout << "Make node\n ";
 		if(CHECK_BIT(next_hop, 1 << (FIRST_BYTE_OFFSET - i))){
 		    parent->right = new node{1,nullptr,nullptr, {}};
 		    f_node = parent = parent->right;
@@ -66,41 +73,65 @@ public:
 	    i++;
 	    size--;
 	}
+	std::cout << "\n ";
 	if(f_node->next_hops.contains(next_hop))
 	{
+	    std::cout << "Already contains\n ";
 	    return false;
 	}
 	else
 	{
+	    std::cout << "MAKE INSERT\n ";
 	    f_node->subnet = mask & next_hop;
 	    f_node->next_hops[next_hop] = interface;
+	    std::cout << "      Subnet:        "<< std::bitset<32>(mask &next_hop ) << '\n';
+	    std::cout << "      nexthop:        "<< std::bitset<32>(next_hop) << " IFace:" << interface << '\n';
 	    return true;
 	}
     }
     std::optional<next_hop_table> lookup(uint32_t dst_ip)
     {
-	node* f_node = first_node(dst_ip << FIRST_BYTE_OFFSET);
+	std::cout <<"\n   Try loojup         " << std::bitset<32>(dst_ip) <<'\n';
+	node* f_node = first_node(dst_ip >> FIRST_BYTE_OFFSET);
 	node* parent = f_node;
 	next_hop_table result;
 	int i = 1;
+	if(!f_node)
+	{
+	    std::cout <<"ERROR";
+	}
+	if(result.empty())
+	{
+	    std::cout <<"ERROR\n";
+	}
+	std::cout << "   Lookup Bit path:   ";
 	while(f_node)
 	{
+	    std::cout << (bool)f_node->bit <<"";
 	    if((f_node = next_node(f_node, FIRST_BYTE_OFFSET - i, dst_ip)))
 	    {
+		std::cout <<"FIRST DEP " << (bool)f_node->bit << " "; 
 		if(!f_node->next_hops.empty())
 		{
+		    std::cout <<"FOUND \n";
 		    result = f_node->next_hops;
 		}
+		std::cout <<"NEXT \n";
 		parent = f_node;
+		i++;
 		continue;
 	    }
+	    i++;
+	    std::cout <<"NNEXT \n";
 	}
-	if(!result.empty())
+	if(result.empty())
 	{
+	    std::cout <<"empty result \n";
 	    return {};
 	}
 	else
 	{
+	    std::cout <<"nonempty \n";
 	    return result;
 	}
     }
@@ -110,6 +141,7 @@ public:
 	node* f_node1 = root_.left;
 	node* f_node2 = root_.right;
 	std::vector<node*> collector;
+	std::cout << "Try print values\n";
 	auto foo = [&](auto && foo, node* nd)
 	    {
 		if(!nd)
@@ -170,6 +202,7 @@ int main ()
     std::cout << trie.lookup(0xffff1122).has_value() << '\n';
     trie.PrintValues();
     std::cout << trie.insert(0xffff1122,0xffffff00, 12) << '\n';
+    std::cout << trie.insert(0xffff3333,0xffffff00, 15) << '\n';
     std::cout << trie.lookup(0xffff1122).has_value() << '\n';
     trie.PrintValues();
 }
