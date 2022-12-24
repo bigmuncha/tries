@@ -72,10 +72,10 @@ struct IPv4
     std::string getWithDots()
 	{
 	    std::stringstream ss;
-	    ss << std::bitset<8>(u.a) << "."
-		<< std::bitset<8>(u.b) << "."
+	    ss << std::bitset<8>(u.d) << "."
 		<< std::bitset<8>(u.c) << "."
-		<< std::bitset<8>(u.d) << ".";
+		<< std::bitset<8>(u.b) << "."
+		<< std::bitset<8>(u.a) ;
 	    return ss.str();
 	}
     std::string getWithoutDots()

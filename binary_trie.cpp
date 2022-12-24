@@ -45,14 +45,15 @@ public:
     bool insert(uint32_t next_hop, uint32_t mask, uint32_t interface)
     {
 	node* f_node = first_node(next_hop >> FIRST_BYTE_OFFSET);
-	std::cout <<"\n   Try Insert nexthop " << std::bitset<32>(next_hop) <<'\n';
+	std::cout <<"\n   Try Insert nexthop " << IPv4::printnum(next_hop) <<'\n';
 	node* parent = f_node;
 	int i = 1;
 	auto size  = __builtin_popcount(mask);
-	std::cout << "   Insert Bit path:   ";
+	std::stringstream ss;
+	ss << "   Insert Bit path:   ";
 	while(size)
 	{
-	    std::cout << (bool)f_node->bit <<"";
+	    ss << (bool)f_node->bit <<"";
 	    if((f_node = next_node(f_node,FIRST_BYTE_OFFSET-i, next_hop )))
 	    {
 //		LLOG_DEBUG() << "Dont make node";
@@ -76,6 +77,7 @@ public:
 	    i++;
 	    size--;
 	}
+	std::cout <<ss.str() << '\n';
 	std::cout << "\n ";
 	if(f_node->next_hops.contains(next_hop))
 	{
@@ -87,8 +89,8 @@ public:
 	    LLOG_DEBUG() << "MAKE INSERT";
 	    f_node->subnet = mask & next_hop;
 	    f_node->next_hops[next_hop] = interface;
-	    LLOG_DEBUG() << "      Subnet:        "<< std::bitset<32>(mask &next_hop ) << '\n';
-	    LLOG_DEBUG() << "      nexthop:       "<< std::bitset<32>(next_hop) << " IFace:" << interface << '\n';
+	    LLOG_DEBUG() << "      Subnet:        "<< IPv4::printnumWithDots(mask &next_hop ) << '\n';
+	    LLOG_DEBUG() << "      nexthop:       "<< IPv4::printnumWithDots(next_hop) << " IFace:" << interface << '\n';
 	    return true;
 	}
     }
@@ -98,39 +100,45 @@ public:
 	node* f_node = first_node(dst_ip >> FIRST_BYTE_OFFSET);
 	node* parent = f_node;
 	next_hop_table result;
-	int i = 1;
+	int i = 0;
 	if(!f_node)
 	{
 	    LLOG_INFO() <<"ERROR";
 	}
-	LLOG_DEBUG() << "   Lookup Bit path:   ";
+	std::cout << "   Lookup Bit path:   ";
 	while(f_node)
 	{
+	    i++;
 	    std::cout << (bool)f_node->bit <<"";
 	    if((f_node = next_node(f_node, FIRST_BYTE_OFFSET - i, dst_ip)))
 	    {
 		//LLOG_DEBUG() <<"FIRST DEP " << (bool)f_node->bit << " ";
 		if(!f_node->next_hops.empty())
 		{
+		    std::cout << " REMEMER " << f_node << " " << parent;
 		    //  LLOG_DEBUG() <<"FOUND";
 		    result = f_node->next_hops;
+		    
 		}
 //		LLOG_DEBUG() <<"NEXT";
 		parent = f_node;
-		i++;
-		continue;
+	    }else
+	    {
+
 	    }
-	    i++;
+
 //	    LLOG_DEBUG() <<"NNEXT ";
 	}
+	std::cout <<" ";
 	if(result.empty())
 	{
-	    LLOG_INFO() <<"empty result ";
+	    std::cout << "BAD " << std::bitset<32>(FIRST_BYTE_OFFSET -i) << '\n';
+	    LLOG_INFO() <<"empty result " << i << " " << (bool)parent->bit << " " << parent;
 	    return {};
 	}
 	else
 	{
-	    LLOG_INFO() <<"nonempty ";
+	    LLOG_INFO() <<"nonempty " << i;
 	    return result;
 	}
     }
@@ -156,10 +164,10 @@ public:
 	foo(foo, f_node2);
 	for(auto nd: collector)
 	{
-	    std::cout << "Subnet:        "<< std::bitset<32>(nd->subnet) << '\n';
+	    std::cout << "Subnet:        "<< IPv4::printnumWithDots(nd->subnet) << '\n';
 	    for(auto& [nexthop, interface]: nd->next_hops)
 	    {
-		std::cout <<"  Next_hop:    " << std::bitset<32>(nexthop) << " interface: " << interface << '\n';
+		std::cout <<"  Next_hop:    " << IPv4::printnumWithDots(nexthop) << " interface: " << interface << '\n';
 	    }
 	}
     }
@@ -228,6 +236,32 @@ int main ()
     /* 	    throw std::exception(); */
     /* 	} */
     /* } */
+    std::array<uint8_t, 4> arr{10, 210,1,1};
+    std::array<uint8_t, 4> check_arr = arr;
+    for(int i =0; arr[2] < 254; i++)
+    {
+	IPv4 net(arr);
+	uint32_t nets = reinterpret_cast<uint32_t&>(net);
+	trie.insert(nets,0xffffff00,i);
+	arr[2]++;
+    }
+    arr = check_arr;
+    for(int i=0; arr[2] < 252; i++)
+    {
+	for(int j =0; arr[3] < 252; j++)
+	{
+	    IPv4 dst(arr);
+	    uint32_t ddst = reinterpret_cast<uint32_t&>(dst);
+	    if(!trie.lookup(ddst).has_value())
+	    {
+		std::cout <<"\n Bad ip               "<< dst.getWithDots() << " i "  << i<<" j" << j << '\n';
+		throw std::exception();
+	    }
+	    arr[3]++;
+	}
+	arr[3] = 1;
+	arr[2]++;
+    }
     IPv4 num(0xffffccdd);
     IPv4 bum(std::array<uint8_t,4>{0xff, 0xff,0xcc,0xdd});
     IPv4 sum(0xff, 0xff, 0xcc, 0xdd);
