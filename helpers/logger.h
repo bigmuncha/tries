@@ -71,7 +71,7 @@ public:
 		  << location_.line() << ":"
 		  << location_.column() << ") "
 	    //<< location_.function_name() << "`: "
-		  << tag_ + str() ;
+		  << tag_ + str() <<'\n' ;
     }
 private:
     LogLevel level_;
@@ -91,7 +91,9 @@ private:
   if constexpr (getLogLevel() >= LogLevel::INFO)                               \
   Logger(INFO, std::experimental::source_location::current())
 
-#define LLOG_ERROR()                                                            \
+#define LLOG_ERROR()                                                           \
   if constexpr (getLogLevel() >= LogLevel::ERROR)                              \
   Logger(ERROR, std::experimental::source_location::current())
+
+
 

@@ -5,6 +5,12 @@
 #include <bitset>
 #include <sstream>
 #include <span>
+#include <logger.h>
+
+#define FIRST_BYTE_OFFSET 31
+//#define ROOT_FLAG 3
+
+#define CHECK_BIT(num, bit)  ((num) & (bit))
 
 struct IPv4
 {
@@ -99,14 +105,14 @@ struct IPv4
 };
 
 
-static void show_nets()
+static void show_nets([[maybe_unused]]uint8_t mask)
 {
-    std::array<uint8_t, 4> arr{101, 210,10,10};
-    for(int i =0; arr[2] < 254; i++)
+    std::array<uint8_t, 4> arr{101, 210,10,1};
+    for(int i =0; arr[3] < 254; i++)
     {
 	IPv4 net(arr);
 	uint32_t nets = reinterpret_cast<uint32_t&>(net);
-	std::cout <<std::hex << nets <<" " << IPv4::printnumWithDots(IPv4::getNet(nets,0xffffff00)) << '\n';
-	arr[2]++;
+	LLOG_DEBUG_C() <<std::hex << nets <<" " << IPv4::printnumWithDots(IPv4::getNet(nets,0xffff0000)) << '\n';
+	arr[3]++;
     }
 }
