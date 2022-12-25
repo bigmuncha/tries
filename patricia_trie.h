@@ -50,17 +50,19 @@ namespace patricia
 		}
 		else
 		{
-		    uint32_t new_nh_path = next_hop &         (0xffffffff << i);
-		    uint32_t old_nh_path = parent->bit_path & (0xffffffff << i);
-		    if(CHECK_BIT(next_hop, 1 << (FIRST_BYTE_OFFSET - i))){
-			parent->right = new node{1,i,new_nh_path,nullptr, nullptr};
-			parent->left =  new node{0,i,old_nh_path,nullptr,nullptr};
+		    if(parent != root_){
+			uint32_t new_nh_path = next_hop &         (0xffffffff << i);
+			uint32_t old_nh_path = parent->bit_path & (0xffffffff << i);
+			if(CHECK_BIT(next_hop, 1 << (FIRST_BYTE_OFFSET - i))){
+			    parent->right = new node{1,i,new_nh_path,nullptr, nullptr};
+			    parent->left =  new node{0,i,old_nh_path,nullptr,nullptr};
+			}
+			else{
+			    parent->left = new node{0,i,new_nh_path,nullptr, nullptr};
+			    parent->right = new node{1,i,old_nh_path,nullptr, nullptr};
+			}
+			parent->len = size;
 		    }
-		    else{
-			parent->left = new node{0,i,new_nh_path,nullptr, nullptr};
-			parent->right = new node{1,i,old_nh_path,nullptr, nullptr};
-		    }
-		    parent->len = size;
 		}
 	    }
 	}
