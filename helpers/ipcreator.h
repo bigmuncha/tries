@@ -6,12 +6,12 @@
 #include <sstream>
 #include <span>
 #include <logger.h>
-
+#include <unordered_map>
 #define FIRST_BYTE_OFFSET 31
 //#define ROOT_FLAG 3
 
 #define CHECK_BIT(num, bit)  ((num) & (bit))
-
+using next_hop_table =     std::unordered_map<uint32_t, uint32_t>;
 struct IPv4
 {
     static uint32_t getNet(uint32_t net, uint32_t mask)
@@ -115,4 +115,29 @@ static void show_nets([[maybe_unused]]uint8_t mask)
 	LLOG_DEBUG_C() <<std::hex << nets <<" " << IPv4::printnumWithDots(IPv4::getNet(nets,0xffff0000)) << '\n';
 	arr[3]++;
     }
+}
+
+//byte map, include 32 entry, each entry correspond byte index
+static  std::unordered_map<uint32_t, uint32_t> getBytemap()
+{
+    std::unordered_map<uint32_t, uint32_t> result;
+    for(uint32_t i = 0,j = 32; i < 32; i++, j--)
+    {
+	result[ j] = 1<< i;
+    }
+    return result;
+};
+
+static uint8_t get_first_nonzero(uint32_t bitarray)
+{
+    for(int i =32; i >0; i--)
+    {
+	if(bitarray & (1 << i))
+	{
+	    LLOG_DEBUG() << "Bit number:        " << 32 - i << "  " << IPv4::printnumWithDots(bitarray) << " "
+			 << IPv4::printnumWithDots(1 << i);
+	    return 32 - i;
+	}
+    }
+    return 0;
 }

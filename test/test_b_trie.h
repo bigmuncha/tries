@@ -1,6 +1,6 @@
 #pragma once
-#include <../b_trie_lpm.h>
-#include <../helpers/ipcreator.h>
+#include <b_trie_lpm.h>
+#include <ipcreator.h>
 
 using namespace buddy_lpm;
 static void test_net_24()
