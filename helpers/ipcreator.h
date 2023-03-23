@@ -6,6 +6,7 @@
 #include <sstream>
 #include <span>
 #include <logger.h>
+#include <cstring>
 
 #define FIRST_BYTE_OFFSET 31
 //#define ROOT_FLAG 3
@@ -104,6 +105,100 @@ struct IPv4
     }u;
 };
 
+struct ipv6
+{
+    bool operator==(struct ipv6 cmp)
+	{
+	    if(std::memcmp(cmp.buff, buff, sizeof(buff)) == 0)
+		return true;
+	    return false;
+	}
+    bool operator==(char* cmp)
+	{
+	    if(std::memcmp(cmp, buff, sizeof(buff)) == 0)
+		return true;
+	    return false;
+	}
+
+    uint8_t buff[16];
+};
+#include <memory>
+
+static ipv6 applyMask( uint8_t const  *arr, int mask)
+{
+    struct ipv6 ret_val;
+    uint8_t * buff = ret_val.buff;
+    for(int i =0; i < 16; i++)
+    {
+	if(mask >=8)
+	{
+	    buff[i] = arr[i];
+	    mask-=8;
+	}
+	else if(mask < 8 && mask != 0)
+	{
+	    buff[i] = arr[i] & (0xff << (8 - mask));
+	    mask = 0;
+	}
+	else
+	{
+	    buff[i] = 0;
+	}
+    }
+    return ret_val;
+}
+
+static ipv6 show_mask( int mask)
+{
+    struct ipv6 ret_val;
+    uint8_t * buff = ret_val.buff;
+    std::memset(buff,0, sizeof(ret_val.buff));
+    for(int i =0; i < 16; i++)
+    {
+	if(mask >=8)
+	{
+	    buff[i] = 0xff;
+	    mask-=8;
+	}
+	else if(mask < 8 && mask != 0)
+	{
+	    buff[i] =(0xff << (8 - mask));
+	    mask = 0;
+	}
+	else
+	{
+	    buff[i] = 0;
+	}
+    }
+    return ret_val;
+}
+
+static std::string getStrIpv6(ipv6 ip)
+{
+    std::stringstream str;
+    for(int i=0; i < 16; i++)
+    {
+	str << std::bitset<8>(ip.buff[i]) << ".";
+    }
+    return str.str();
+}
+static std::string getStrIpv6(u_char *ip)
+{
+    std::stringstream str;
+    for(int i=0; i < 16; i++)
+    {
+	str << std::bitset<8>(ip[i]) << ".";
+    }
+    return str.str();
+}
+
+struct ipv6_addr
+{
+    uint64_t first;
+    uint64_t second;
+};
+
+//char [16] omar ()
 
 static void show_nets([[maybe_unused]]uint8_t mask)
 {

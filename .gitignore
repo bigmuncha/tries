@@ -1,0 +1,5 @@
+build
+.cache
+main
+.gdb_history
+peda*
