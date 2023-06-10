@@ -182,12 +182,32 @@ static std::string getStrIpv6(ipv6 ip)
     }
     return str.str();
 }
+static std::string getStrIpv6Hex(ipv6 ip)
+{
+    std::stringstream str;
+    for(int i=0; i < 16; i++)
+    {
+	str << std::hex << (int)(ip.buff[i]) << ":";
+    }
+    return str.str();
+}
+
 static std::string getStrIpv6(u_char *ip)
 {
     std::stringstream str;
     for(int i=0; i < 16; i++)
     {
 	str << std::bitset<8>(ip[i]) << ".";
+    }
+    return str.str();
+}
+
+static std::string getStrIpv6Hex(u_char *ip)
+{
+    std::stringstream str;
+    for(int i=0; i < 16; i++)
+    {
+	str << std::hex << (int)(ip[i]) << ":";
     }
     return str.str();
 }
