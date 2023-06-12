@@ -159,18 +159,24 @@ tbl8_pool_init(struct rte_lpm6 *lpm)
 
 	lpm->tbl8_pool_pos = 0;
 }
-
+#include <iostream>
 /*
  * Get an index of a free tbl8 from the pool
  */
+static unsigned int omarGLOB = 0;
 static inline uint32_t
 tbl8_get(struct rte_lpm6 *lpm, uint32_t *tbl8_ind)
 {
 	if (lpm->tbl8_pool_pos == lpm->number_tbl8s)
+	{
+	    throw std::exception();
 		/* no more free tbl8 */
 		return -ENOSPC;
-
+	}
 	/* next index */
+	omarGLOB+= RTE_LPM6_TBL8_GROUP_NUM_ENTRIES *sizeof(struct rte_lpm6_tbl_entry);
+	/* static int omar = sizeof(lpm->tbl24); */
+	/* std::cout <<"Create new table: " << (omar+=256) <<'\n'; */
 	*tbl8_ind = lpm->tbl8_pool[lpm->tbl8_pool_pos++];
 	return 0;
 }
@@ -469,7 +475,7 @@ expand_rule(struct rte_lpm6 *lpm, uint32_t tbl8_gindex, uint8_t old_depth,
 
 		.ext_entry = 0,
 	};
-	std::cout << "Expand rule " <<'\n';
+//	std::cout << "Expand rule " <<'\n';
 	for (j = tbl8_gindex; j < tbl8_group_end; j++) {
 		if (!lpm->tbl8[j].valid || (lpm->tbl8[j].ext_entry == 0
 				&& lpm->tbl8[j].depth <= old_depth)) {
@@ -954,9 +960,11 @@ simulate_add(struct rte_lpm6 *lpm, const uint8_t *masked_ip, uint8_t depth)
 	}
 
 	if (tbl8_available(lpm) < total_need_tbl_nb)
+	{
+	    throw std::exception();
 		/* not enough tbl8 to add a rule */
 		return -ENOSPC;
-
+	}
 	return 0;
 }
 #include <ipcreator.h>
@@ -980,6 +988,8 @@ rte_lpm6_add(struct rte_lpm6 *lpm, const uint8_t *ip, uint8_t depth,
 	/* Check user arguments. */
 	if ((lpm == NULL) || (depth < 1) || (depth > RTE_LPM6_MAX_DEPTH))
 		return -EINVAL;
+
+	static int counter =0;
 
 	/* Copy the IP and mask it to avoid modifying user's input data. */
 	ip6_copy_addr(masked_ip, ip);
@@ -1096,7 +1106,7 @@ lookup_step(const struct rte_lpm6 *lpm, const struct rte_lpm6_tbl_entry *tbl,
 
 	/* Take the integer value from the pointer. */
 	tbl_entry = *(const uint32_t *)tbl;
-	std::cout << "ip:   " << std::bitset<8>(ip[first_byte -1]) <<'\n';
+	//std::cout << "ip:   " << std::bitset<8>(ip[first_byte -1]) <<'\n';
 
 	//std::cout << "OMAR: " << getStrIpv6Hex(ip) << "/"<< (int)depth << '\n';
 

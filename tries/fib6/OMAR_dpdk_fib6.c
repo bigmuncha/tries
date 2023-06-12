@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include <string.h>
 
+
+
 #include <rte_eal_memconfig.h>
 #include <rte_errno.h>
 #include <rte_malloc.h>
@@ -118,7 +120,10 @@ rte_fib6_add(struct rte_fib6 *fib, const uint8_t ip[RTE_FIB6_IPV6_ADDR_SIZE],
 {
 	if ((fib == NULL) || (ip == NULL) || (fib->modify == NULL) ||
 			(depth > RTE_FIB6_MAXDEPTH))
+	{
+	    std::cout <<"EEEEROR" << '\n';
 		return -EINVAL;
+	}
 	return fib->modify(fib, ip, depth, next_hop, RTE_FIB6_ADD);
 }
 

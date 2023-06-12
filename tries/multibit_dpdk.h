@@ -176,11 +176,31 @@ multibit_rte_lpm6_lookup(const struct multibit_rte_lpm6 *lpm, const uint8_t *ip,
  *  @return
  *   -EINVAL for incorrect arguments, otherwise 0
  */
+
 int
 multibit_rte_lpm6_lookup_bulk_func(const struct multibit_rte_lpm6 *lpm,
 		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
-		int32_t *next_hops, unsigned int n);
+				   int32_t *next_hops, unsigned int n);
 
+int
+multibit_rte_lpm6_lookup_bulk_func_branch(const struct multibit_rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+				   int32_t *next_hops, unsigned int n);
+
+int
+multibit_rte_lpm6_lookup_bulk_func_prefetch(const struct multibit_rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+				   int32_t *next_hops, unsigned int n);
+
+int
+multibit_rte_lpm6_lookup_bulk_func_branch_plus_prefetch(const struct multibit_rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+				   int32_t *next_hops, unsigned int n);
+
+int
+multibit_rte_lpm6_lookup_bulk_func_cache(const struct multibit_rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+				   int32_t *next_hops, unsigned int n);
 
 #ifdef __cplusplus
 }

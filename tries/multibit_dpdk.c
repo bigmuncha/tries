@@ -22,7 +22,7 @@
 
 #define RTE_LPM6_TBL24_NUM_ENTRIES        (1 << 8)
 #define RTE_LPM6_TBL8_GROUP_NUM_ENTRIES         256
-#define RTE_LPM6_TBL8_MAX_NUM_GROUPS      (1 << 21)
+#define RTE_LPM6_TBL8_MAX_NUM_GROUPS      (1 << 22)
 
 #define RTE_LPM6_VALID_EXT_ENTRY_BITMASK 0xA0000000
 #define RTE_LPM6_LOOKUP_SUCCESS          0x20000000
@@ -158,18 +158,35 @@ tbl8_pool_init(struct multibit_rte_lpm6 *lpm)
 
 	lpm->tbl8_pool_pos = 0;
 }
-
+#include <iostream>
 /*
  * Get an index of a free tbl8 from the pool
  */
+static unsigned int omarGLOB = 0;
 static inline uint32_t
 tbl8_get(struct multibit_rte_lpm6 *lpm, uint32_t *tbl8_ind)
 {
+    	static unsigned int counter = 0;
+
+
 	if (lpm->tbl8_pool_pos == lpm->number_tbl8s)
+	{
+	    std::cout << "NOMORE ";
+	    std::cout << "current pos: " << lpm->tbl8_pool_pos << " number all: " << lpm->number_tbl8s <<'\n';
+	    std::cout  <<"OOMAR" << ++counter <<" " << omarGLOB <<'\n';
+	    throw std::exception();
+
 		/* no more free tbl8 */
 		return -ENOSPC;
-
+	}
 	/* next index */
+	omarGLOB+= RTE_LPM6_TBL8_GROUP_NUM_ENTRIES *sizeof(struct multibit_rte_lpm6_tbl_entry);
+	if(counter % 1113 == 0)
+	{
+	    //std::cout << "current pos: " << lpm->tbl8_pool_pos << " number all: " << lpm->number_tbl8s <<'\n';
+	    //std::cout  << ++counter <<" " << omarGLOB <<'\n';
+	}
+	counter++;
 	*tbl8_ind = lpm->tbl8_pool[lpm->tbl8_pool_pos++];
 	return 0;
 }
@@ -183,7 +200,6 @@ tbl8_put(struct multibit_rte_lpm6 *lpm, uint32_t tbl8_ind)
 	if (lpm->tbl8_pool_pos == 0)
 		/* pool is full */
 		return -ENOSPC;
-
 	lpm->tbl8_pool[--lpm->tbl8_pool_pos] = tbl8_ind;
 	return 0;
 }
@@ -248,6 +264,7 @@ multibit_rte_lpm6_create(const char *name, int socket_id,
 	if ((name == NULL) || (socket_id < -1) || (config == NULL) ||
 			(config->max_rules == 0) ||
 			config->number_tbl8s > RTE_LPM6_TBL8_MAX_NUM_GROUPS) {
+	    std::cout << "ERROR SSSS\n";
 		rte_errno = EINVAL;
 		return NULL;
 	}
@@ -284,6 +301,7 @@ multibit_rte_lpm6_create(const char *name, int socket_id,
 		rte_errno = ENOMEM;
 		goto fail_wo_unlock;
 	}
+	std::cout << "Alloc for tlb8 pool: " << 	sizeof(uint32_t) * config->number_tbl8s << '\n';
 
 	/* allocate tbl8 headers */
 	tbl8_hdrs = rte_malloc(NULL,
@@ -307,7 +325,7 @@ multibit_rte_lpm6_create(const char *name, int socket_id,
 	lpm = NULL;
 
 	/* allocate tailq entry */
-
+	std::cout << "Alloc for tlb8 memory: " <<  mem_size <<'\n';
 	/* Allocate memory to store the LPM data structures. */
 	lpm = rte_zmalloc_socket(mem_name, (size_t)mem_size,
 			RTE_CACHE_LINE_SIZE, socket_id);
@@ -349,6 +367,7 @@ void
 multibit_rte_lpm6_free(struct multibit_rte_lpm6 *lpm)
 {
 	struct multibit_rte_lpm6_list *lpm_list;
+	
 	/* Check user arguments. */
 	if (lpm == NULL)
 		return;
@@ -357,6 +376,7 @@ multibit_rte_lpm6_free(struct multibit_rte_lpm6 *lpm)
 	rte_free(lpm->tbl8_pool);
 	rte_hash_free(lpm->rules_tbl);
 	rte_free(lpm);
+	
 }
 
 /* Find a rule */
@@ -458,7 +478,7 @@ expand_rule(struct multibit_rte_lpm6 *lpm, uint32_t tbl8_gindex, uint8_t old_dep
 
 		.ext_entry = 0,
 	};
-	std::cout << "Expand rule " <<'\n';
+	//std::cout << "Expand rule " <<'\n';
 	for (j = tbl8_gindex; j < tbl8_group_end; j++) {
 		if (!lpm->tbl8[j].valid || (lpm->tbl8[j].ext_entry == 0
 				&& lpm->tbl8[j].depth <= old_depth)) {
@@ -589,9 +609,9 @@ add_step(struct multibit_rte_lpm6 *lpm, struct multibit_rte_lpm6_tbl_entry *tbl,
 	/* Number of bits covered in this step */
 	bits_covered = (uint8_t)((bytes+first_byte-1)*BYTE_SIZE);
 
-	std::cout << "byte number: " << tbl_ind  <<'\n';
-        std::cout << "entry ind: " << entry_ind  <<'\n';
-	std::cout << "bits covered: " << (int )bits_covered <<'\n';
+	/* std::cout << "byte number: " << tbl_ind  <<'\n'; */
+        /* std::cout << "entry ind: " << entry_ind  <<'\n'; */
+	/* std::cout << "bits covered: " << (int )bits_covered <<'\n'; */
 
 	/* Number of bits covered in this step */
 
@@ -600,9 +620,9 @@ add_step(struct multibit_rte_lpm6 *lpm, struct multibit_rte_lpm6_tbl_entry *tbl,
 	 * expand the rule across the relevant positions in the table.
 	 */
 	if (depth <= bits_covered) {
-	    std::cout << "I am cover"<<'\n';
+	    //std::cout << "I am cover"<<'\n';
 		tbl_range = 1 << (bits_covered - depth);
-		std::cout << "From " << entry_ind << " to " << entry_ind+tbl_range <<'\n';
+		//	std::cout << "From " << entry_ind << " to " << entry_ind+tbl_range <<'\n';
 		for (i = entry_ind; i < (entry_ind + tbl_range); i++) {
 			if (!tbl[i].valid || (tbl[i].ext_entry == 0 &&
 					tbl[i].depth <= depth)) {
@@ -614,11 +634,11 @@ add_step(struct multibit_rte_lpm6 *lpm, struct multibit_rte_lpm6_tbl_entry *tbl,
 					.valid_group = VALID,
 					.ext_entry = 0,
 				};
-				std::cout << "I am here"<<'\n';
+				//		std::cout << "I am here"<<'\n';
 				tbl[i] = new_tbl_entry;
 
 			} else if (tbl[i].ext_entry == 1) {
-			    std::cout << "I am expand rule"<<'\n';
+			    //std::cout << "I am expand rule"<<'\n';
 				/*
 				 * If tbl entry is valid and extended calculate the index
 				 * into next tbl8 and expand the rule across the data structure.
@@ -629,7 +649,7 @@ add_step(struct multibit_rte_lpm6 *lpm, struct multibit_rte_lpm6_tbl_entry *tbl,
 						next_hop, VALID);
 			}
 			else{
-			    std::cout << "I am skip"<<'\n';
+			    //std::cout << "I am skip"<<'\n';
 			}
 
 		}
@@ -645,10 +665,10 @@ add_step(struct multibit_rte_lpm6 *lpm, struct multibit_rte_lpm6_tbl_entry *tbl,
 	 * and calculate the index to the next table.
 	 */
 	else {
-	    std::cout << "I am not cover"<<'\n';
+	    //std::cout << "I am not cover"<<'\n';
 		/* If it's invalid a new tbl8 is needed */
 		if (!tbl[entry_ind].valid) {
-		    std::cout << "I am not valid"<<'\n';
+		    //std::cout << "I am not valid"<<'\n';
 			/* get a new table */
 			ret = tbl8_get(lpm, &tbl8_gindex);
 			if (ret != 0)
@@ -661,7 +681,7 @@ add_step(struct multibit_rte_lpm6 *lpm, struct multibit_rte_lpm6_tbl_entry *tbl,
 					RTE_LPM6_TBL8_GROUP_NUM_ENTRIES *
 					sizeof(struct multibit_rte_lpm6_tbl_entry));
 
-			std::cout << "Make new allocation"<<'\n';
+//			std::cout << "Make new allocation"<<'\n';
 			/* init the new table's header:
 			 *   save the reference to the owner table
 			 */
@@ -726,7 +746,7 @@ add_step(struct multibit_rte_lpm6 *lpm, struct multibit_rte_lpm6_tbl_entry *tbl,
 				.valid_group = VALID,
 				.ext_entry = 1,
 			};
-			std::cout << "I am valid"<<'\n';
+//			std::cout << "I am valid"<<'\n';
 			tbl[entry_ind] = new_tbl_entry;
 
 			/* update the current table's reference counter */
@@ -736,7 +756,7 @@ add_step(struct multibit_rte_lpm6 *lpm, struct multibit_rte_lpm6_tbl_entry *tbl,
 
 		*next_tbl_ind = tbl[entry_ind].lpm6_tbl8_gindex;
 
-		std::cout << "next table index: " << *next_tbl_ind <<'\n';
+//		std::cout << "next table index: " << *next_tbl_ind <<'\n';
 		*next_tbl = &(lpm->tbl8[*next_tbl_ind *
 				  RTE_LPM6_TBL8_GROUP_NUM_ENTRIES]);
 	}
@@ -779,9 +799,12 @@ simulate_add(struct multibit_rte_lpm6 *lpm, const uint8_t *masked_ip, uint8_t de
 	}
 
 	if (tbl8_available(lpm) < total_need_tbl_nb)
+	{
+	    std:: cout << "Not enouth " << total_need_tbl_nb <<"\n";
+	    throw std::exception();
 		/* not enough tbl8 to add a rule */
 		return -ENOSPC;
-
+	}
 	return 0;
 }
 #include <ipcreator.h>
@@ -800,11 +823,14 @@ multibit_rte_lpm6_add(struct multibit_rte_lpm6 *lpm, const uint8_t *ip, uint8_t 
 	int status;
 	uint8_t masked_ip[RTE_LPM6_IPV6_ADDR_SIZE];
 	int i;
-
-	std::cout  <<"\nAdd route: nexhop " << next_hop <<'\n'
-		   << "ip:   " << getStrIpv6Hex((unsigned char*)ip) <<'\n'
-		   << "ip:   " << getStrIpv6((unsigned char*)ip) <<'\n'
-		   << "mask: " << getStrIpv6(show_mask(depth)) <<"\n";
+	static int counter =0;
+	/* counter++; */
+	/* if(counter %2) */
+	/*     std::cout  << counter <<" " << omarGLOB <<'\n'; */
+	/* std::cout  <<"\nAdd route: nexhop " << next_hop <<'\n' */
+	/* 	   << "ip:   " << getStrIpv6Hex((unsigned char*)ip) <<'\n' */
+	/* 	   << "ip:   " << getStrIpv6((unsigned char*)ip) <<'\n' */
+	/* 	   << "mask: " << getStrIpv6(show_mask(depth)) <<"\n"; */
 
 	//std::cout << "OMAR: " << getStrIpv6Hex(ip) << "/"<< (int)depth << '\n';
 
@@ -819,13 +845,17 @@ multibit_rte_lpm6_add(struct multibit_rte_lpm6 *lpm, const uint8_t *ip, uint8_t 
 	/* Simulate adding a new route */
 	int ret = simulate_add(lpm, masked_ip, depth);
 	if (ret < 0)
+	{
+	    std:: cout << "Bad simulate\n";
 		return ret;
-
+	}
 	/* Add the rule to the rule table. */
 	int is_new_rule = rule_add(lpm, masked_ip, depth, next_hop);
 	/* If there is no space available for new rule return error. */
-	if (is_new_rule < 0)
+	if (is_new_rule < 0){
+	    std:: cout << "OMMARR\n";
 		return is_new_rule;
+	}
 
 	/* Inspect the first three bytes through tbl24 on the first step. */
 	tbl = lpm->tbl24;
@@ -918,36 +948,41 @@ multibit_rte_lpm6_lookup(const struct multibit_rte_lpm6 *lpm, const uint8_t *ip,
 /*
  * Looks up a group of IP addresses
  */
+#define CACHE 0
+#define BRACH 1
+#define PREFETCH 0
 int
 multibit_rte_lpm6_lookup_bulk_func(const struct multibit_rte_lpm6 *lpm,
 		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
 		int32_t *next_hops, unsigned int n)
 {
+
 	unsigned int i;
 	const struct multibit_rte_lpm6_tbl_entry *tbl;
 	const struct multibit_rte_lpm6_tbl_entry *tbl_next = NULL;
 	uint32_t tbl24_index, next_hop;
 	uint8_t first_byte;
 	int status;
-
 	/* DEBUG: Check user input arguments. */
 	if ((lpm == NULL) || (ips == NULL) || (next_hops == NULL))
+	{
+	    std::cout << "error";
 		return -EINVAL;
-
+	}
 	for (i = 0; i < n; i++) {
 		first_byte = LOOKUP_FIRST_BYTE;
-		tbl24_index = (ips[i][0] << BYTES2_SIZE) |
-				(ips[i][1] << BYTE_SIZE) | ips[i][2];
+		tbl24_index = ips[i][0]; /* (ips[i][0] << BYTES2_SIZE) | */
+				/* (ips[i][1] << BYTE_SIZE) | ips[i][2]; */
 
 		/* Calculate pointer to the first entry to be inspected */
 		tbl = &lpm->tbl24[tbl24_index];
-
 		do {
+
 			/* Continue inspecting following levels
 			 * until success or failure
 			 */
 			status = lookup_step(lpm, tbl, &tbl_next, ips[i],
-					first_byte++, &next_hop);
+					     first_byte++, &next_hop);
 			tbl = tbl_next;
 		} while (status == 1);
 
@@ -955,10 +990,169 @@ multibit_rte_lpm6_lookup_bulk_func(const struct multibit_rte_lpm6 *lpm,
 			next_hops[i] = -1;
 		else
 			next_hops[i] = (int32_t)next_hop;
+
 	}
 
 	return 0;
 }
+
+int
+multibit_rte_lpm6_lookup_bulk_func_branch(const struct multibit_rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+				   int32_t *next_hops, unsigned int n)
+{
+	unsigned int i;
+	const struct multibit_rte_lpm6_tbl_entry *tbl;
+	const struct multibit_rte_lpm6_tbl_entry *tbl_next = NULL;
+	uint32_t tbl24_index, next_hop;
+	uint8_t first_byte;
+	int status;
+	/* DEBUG: Check user input arguments. */
+	if ((lpm == NULL) || (ips == NULL) || (next_hops == NULL))
+	{
+	    std::cout << "error";
+		return -EINVAL;
+	}
+	for (i = 0; i < n; i++) {
+		first_byte = LOOKUP_FIRST_BYTE;
+		tbl24_index = ips[i][0]; /* (ips[i][0] << BYTES2_SIZE) | */
+				/* (ips[i][1] << BYTE_SIZE) | ips[i][2]; */
+
+		/* Calculate pointer to the first entry to be inspected */
+		tbl = &lpm->tbl24[tbl24_index];
+		do {
+
+			/* Continue inspecting following levels
+			 * until success or failure
+			 */
+			status = lookup_step(lpm, tbl, &tbl_next, ips[i],
+					     first_byte++, &next_hop);
+			tbl = tbl_next;
+		    } while (likely(status == 1));
+		if (status < 0)
+			next_hops[i] = -1;
+		else
+			next_hops[i] = (int32_t)next_hop;
+
+	}
+
+	return 0;
+}
+#include <rte_prefetch.h>
+int
+multibit_rte_lpm6_lookup_bulk_func_prefetch(const struct multibit_rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+				   int32_t *next_hops, unsigned int n)
+{
+	unsigned int i;
+	const struct multibit_rte_lpm6_tbl_entry *tbl;
+	const struct multibit_rte_lpm6_tbl_entry *tbl_next = NULL;
+	const struct multibit_rte_lpm6_tbl_entry *prefetch_tbl_next = NULL;
+	uint32_t tbl24_index, next_hop;
+	uint8_t first_byte;
+	int status;
+	/* DEBUG: Check user input arguments. */
+	if ((lpm == NULL) || (ips == NULL) || (next_hops == NULL))
+	{
+	    std::cout << "error";
+		return -EINVAL;
+	}
+	for (i = 0; i < n; i++) {
+		first_byte = LOOKUP_FIRST_BYTE;
+		tbl24_index = ips[i][0]; /* (ips[i][0] << BYTES2_SIZE) | */
+				/* (ips[i][1] << BYTE_SIZE) | ips[i][2]; */
+
+		/* Calculate pointer to the first entry to be inspected */
+		tbl = &lpm->tbl24[tbl24_index];
+		do {
+
+		    {
+			uint32_t tbl8_index, tbl_entry;
+
+			/* Take the integer value from the pointer. */
+			tbl_entry = *(const uint32_t *)tbl;
+
+		    /* If it is valid and extended we calculate the new pointer to return. */
+
+			tbl8_index = ips[i][first_byte] +
+			    ((tbl_entry & RTE_LPM6_TBL8_BITMASK) *
+			     RTE_LPM6_TBL8_GROUP_NUM_ENTRIES);
+			prefetch_tbl_next = &lpm->tbl8[tbl8_index];
+
+			rte_prefetch0(prefetch_tbl_next);
+		    }
+			/* Continue inspecting following levels
+			 * until success or failure
+			 */
+			status = lookup_step(lpm, tbl, &tbl_next, ips[i],
+					     first_byte++, &next_hop);
+			tbl = tbl_next;
+		    } while (status == 1);
+		if (status < 0)
+			next_hops[i] = -1;
+		else
+			next_hops[i] = (int32_t)next_hop;
+
+	}
+
+	return 0;
+}
+
+int
+multibit_rte_lpm6_lookup_bulk_func_cache(const struct multibit_rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+				   int32_t *next_hops, unsigned int n)
+{
+
+	unsigned int i;
+	const struct multibit_rte_lpm6_tbl_entry *tbl;
+	const struct multibit_rte_lpm6_tbl_entry *tbl_next = NULL;
+	uint32_t tbl24_index, next_hop;
+	uint8_t first_byte;
+	int status;
+	/* DEBUG: Check user input arguments. */
+	if ((lpm == NULL) || (ips == NULL) || (next_hops == NULL))
+	{
+	    std::cout << "error";
+		return -EINVAL;
+	}
+	uint8_t prev_ip[RTE_LPM6_IPV6_ADDR_SIZE] = {0};
+	uint32_t prev_nh = -1; 
+	for (i = 0; i < n; i++) {
+	    if(memcmp(prev_ip, ips[i], RTE_LPM6_IPV6_ADDR_SIZE) == 0)
+	    {
+		next_hops[i] = prev_nh;
+		continue;
+	    }
+		first_byte = LOOKUP_FIRST_BYTE;
+		tbl24_index = ips[i][0]; /* (ips[i][0] << BYTES2_SIZE) | */
+				/* (ips[i][1] << BYTE_SIZE) | ips[i][2]; */
+
+		/* Calculate pointer to the first entry to be inspected */
+		tbl = &lpm->tbl24[tbl24_index];
+		do {
+
+			/* Continue inspecting following levels
+			 * until success or failure
+			 */
+			status = lookup_step(lpm, tbl, &tbl_next, ips[i],
+					     first_byte++, &next_hop);
+			tbl = tbl_next;
+		} while (status == 1);
+
+		if (status < 0)
+			next_hops[i] = -1;
+		else
+			next_hops[i] = (int32_t)next_hop;
+
+		memcpy(prev_ip, ips[i], RTE_LPM6_IPV6_ADDR_SIZE);
+		prev_nh = next_hop;
+	}
+
+	return 0;
+
+}
+
 
 /*
  * Look for a rule in the high-level rules table
@@ -1054,6 +1248,10 @@ multibit_rte_lpm6_delete_bulk_func(struct multibit_rte_lpm6 *lpm,
 void
 multibit_rte_lpm6_delete_all(struct multibit_rte_lpm6 *lpm)
 {
+    	std::cout << "current pos: " << lpm->tbl8_pool_pos << " number all: " << lpm->number_tbl8s <<'\n';
+	//std::cout  <<"OOMAR "  << omarGLOB <<'\n';
+
+
 	/* Zero used rules counter. */
 	lpm->used_rules = 0;
 
@@ -1134,13 +1332,13 @@ rule_find_range(struct multibit_rte_lpm6 *lpm, const uint8_t *ip, uint8_t depth,
 		  uint32_t *out_tbl_ind)
 {
 	uint32_t ind;
-	uint32_t first_3bytes = (uint32_t)ip[0] << 16 | ip[1] << 8 | ip[2];
+	uint32_t first_3bytes = (uint32_t)ip[0]; /* << 16 | ip[1] << 8 | ip[2]; */
 
-	if (depth <= 24) {
+	if (depth <= 8) {
 		/* rule is within the top level */
 		ind = first_3bytes;
 		*from = &lpm->tbl24[ind];
-		ind += (1 << (24 - depth)) - 1;
+		ind += (1 << (8 - depth)) - 1;
 		*to = &lpm->tbl24[ind];
 		*out_tbl_ind = TBL24_IND;
 	} else {
@@ -1152,9 +1350,9 @@ rule_find_range(struct multibit_rte_lpm6 *lpm, const uint8_t *ip, uint8_t depth,
 		tbl = &lpm->tbl8[tbl_ind *
 				RTE_LPM6_TBL8_GROUP_NUM_ENTRIES];
 		/* current ip byte, the top level is already behind */
-		uint8_t byte = 3;
+		uint8_t byte = 1;
 		/* minus top level */
-		depth -= 24;
+		depth -= 8;
 
 		/* iterate through levels (tbl8s)
 		 * until we reach the last one

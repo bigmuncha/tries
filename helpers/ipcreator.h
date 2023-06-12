@@ -7,7 +7,9 @@
 #include <span>
 #include <logger.h>
 #include <cstring>
-
+#include "ipsaver.h"
+#include <rte_random.h>
+#include <rte_timer.h>
 #define FIRST_BYTE_OFFSET 31
 //#define ROOT_FLAG 3
 
@@ -239,4 +241,134 @@ static void show_nets([[maybe_unused]]uint8_t mask)
 	LLOG_DEBUG_C() <<std::hex << nets <<" " << IPv4::printnumWithDots(IPv4::getNet(nets,0xffff0000)) << '\n';
 	arr[3]++;
     }
+}
+
+static inline void mask_ip6_prefix(uint8_t *ip_out,
+	const uint8_t *ip_in, uint8_t depth)
+{
+	int k;
+	uint8_t mask_in, mask_out;
+
+	for (k = 0; k < 16; k++) {
+		if (depth >= 8)
+			ip_out[k] = ip_in[k];
+		else if (depth > 0) {
+			mask_in = (uint8_t)((unsigned int)(-1) << (8 - depth));
+			mask_out = ~mask_in;
+			ip_out[k] = (ip_in[k] & mask_in)
+					| (ip_out[k] & mask_out);
+		} else
+			return;
+
+		depth -= 8;
+	}
+}
+
+#include <vector>
+
+template <typename PREFIX>
+static void generate_long_ip_table_vec(std::vector<PREFIX> &vec, int num, char average_len, PREFIX* base, int base_max)
+{
+    for(int i = 0,j =0; i < num; i++, j++)
+    {
+	if(j >= base_max)
+	    j=0;
+	auto temp = lrand48();
+	PREFIX rule = base[j];
+	rule.depth = temp % 128;
+	rule.ip[temp%16] = temp %255;
+	vec.push_back(rule);
+    }
+}
+#include <cmath>
+template <typename PREFIX>
+static void generate_long_ip_table_vec(std::vector<PREFIX> &vec, int num, char average_len, char second_len =0)
+{
+    for(int i = 0; i < num; i++)
+    {
+	PREFIX rule;
+	for(int j =0; j < 16; j++)
+	{
+	    rule.ip[j] = rte_rand();
+	}
+	auto temp = rte_rand();
+	rule.depth = temp % 128;
+	if(average_len!=0)
+	{
+	    if(rule.depth % 5 == 0)
+	    {
+		if(second_len !=0)
+		{
+		    if(rule.depth %10 == 0)
+		    {
+			rule.depth = second_len;
+		    }
+		    else
+			rule.depth = average_len;
+		}
+		else
+		    rule.depth = average_len;
+	    }
+	}
+	vec.push_back(rule);
+    }
+}
+
+template <typename PREFIX, typename IPS>
+static void generate_large_ips_table_vec(const std::vector<PREFIX> &from,
+					 std::vector<IPS> &to, int ips_size,  int reps_number, int pace)
+{
+
+    int current_pace = pace;
+    for(int i =0, from_index =0; i< ips_size;i++)
+    {
+	if(from_index >= from.size())
+	    from_index = 0;
+
+	IPS ips;
+	for(int j =0; j < 16; j++)
+	    ips.ip[j] = lrand48();
+
+	mask_ip6_prefix(ips.ip,
+			from[from_index].ip, from[from_index].depth);
+	ips.next_hop = from[from_index].next_hop;
+	if(current_pace >= pace)
+	{
+	    for(int f =0; f < reps_number; f++)
+	    {
+		std::cout <<"pace create\n";
+		to.push_back(ips);
+
+	    }
+	    current_pace = 0;
+	    continue;
+	}
+	std::cout <<"pace increment\n";
+	to.push_back(ips);
+	current_pace++;
+    }
+}
+
+static void
+print_route_distribution(const struct rules_tbl_entry *table, uint32_t n)
+{
+	unsigned int i, j;
+
+	printf("Route distribution per prefix width:\n");
+	printf("DEPTH    QUANTITY (PERCENT)\n");
+	printf("---------------------------\n");
+
+	/* Count depths. */
+	for (i = 1; i <= 128; i++) {
+		unsigned int depth_counter = 0;
+		double percent_hits;
+
+		for (j = 0; j < n; j++)
+			if (table[j].depth == (uint8_t) i)
+				depth_counter++;
+
+		percent_hits = ((double)depth_counter)/((double)n) * 100;
+		printf("%.2u%15u (%.2f)\n", i, depth_counter, percent_hits);
+	}
+	printf("\n");
 }

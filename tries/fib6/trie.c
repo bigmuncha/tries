@@ -47,6 +47,7 @@ get_scalar_fn(enum rte_fib_trie_nh_sz nh_sz)
 static inline rte_fib6_lookup_fn_t
 get_vector_fn(enum rte_fib_trie_nh_sz nh_sz)
 {
+        std::cout <<"VECTOR NOT support\n" ;
 #ifdef CC_TRIE_AVX512_SUPPORT
 	if ((rte_cpu_get_flag_enabled(RTE_CPUFLAG_AVX512F) <= 0) ||
 			(rte_vect_get_max_simd_bitwidth() < RTE_VECT_SIMD_512))
