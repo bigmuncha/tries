@@ -1,15 +1,21 @@
+#include "ipcreator.h"
+#include <cstdint>
 #include <stdint.h>
 #include <sys/types.h>
+#include <rte_lpm6.h>
+#define ITERATIONS (1 << 10)
+#define BATCH_SIZE 100000
+#define NUMBER_TBL8S                                           (1 << 16)
 
 struct rules_tbl_entry {
 	uint8_t ip[16];
 	uint8_t depth;
-	uint8_t next_hop;
+        uint32_t next_hop;
 };
 
 struct ips_tbl_entry {
 	uint8_t ip[16];
-	uint8_t next_hop;
+	u_int32_t next_hop;
 };
 
 static struct rules_tbl_entry large_route_table[] = {
@@ -1071,7 +1077,7 @@ static inline int check_lpm6_rule(uint8_t *ip,
  * if found that some item in rule[] is matched return 0,
  * else return -1;
  */
-static int get_next_hop(uint8_t *ip, uint8_t *next_hop,
+static int get_next_hop(uint8_t *ip, uint32_t *next_hop,
 	const struct rules_tbl_entry *rule, int rule_num)
 {
 	int i;
@@ -1139,7 +1145,7 @@ static void generate_large_ips_table(int gen_expected_next_hop)
 }
 
 #include "fix_stride_trie.h"
-
+//#include <OMAR_dpdk_lpm6.h>
 static void
 print_route_distribution(const struct rules_tbl_entry *table, uint32_t n)
 {
@@ -1163,133 +1169,268 @@ print_route_distribution(const struct rules_tbl_entry *table, uint32_t n)
 	}
 	printf("\n");
 }
-
-#define RTE_STD_C11
-static inline uint64_t
-rte_rdtsc(void)
-{
-	union {
-		uint64_t tsc_64;
-		RTE_STD_C11
-		struct {
-			uint32_t lo_32;
-			uint32_t hi_32;
-		};
-	} tsc;
-
-#ifdef RTE_LIBRTE_EAL_VMWARE_TSC_MAP_SUPPORT
-	if (unlikely(rte_cycles_vmware_tsc_map)) {
-		/* ecx = 0x10000 corresponds to the physical TSC for VMware */
-		asm volatile("rdpmc" :
-		             "=a" (tsc.lo_32),
-		             "=d" (tsc.hi_32) :
-		             "c"(0x10000));
-		return tsc.tsc_64;
-	}
-#endif
-
-	asm volatile("rdtsc" :
-		     "=a" (tsc.lo_32),
-		     "=d" (tsc.hi_32));
-	return tsc.tsc_64;
-}
-#include <rte_random.h>
-#define ITERATIONS (1 )
-#define BATCH_SIZE 100000
+#define MAX_DEPTH                                                    128
+#define MAX_RULES                                                1000000
 #define NUMBER_TBL8S                                           (1 << 16)
+#define MAX_NUM_TBL8S                                          (1 << 21)
+#define PASS 0
+#define SOCKET_ID_ANY -1 /**< Any NUMA socket. */
 
+#define TEST_LPM_ASSERT(cond) do {                                            \
+	if (!(cond)) {                                                        \
+		printf("Error at line %d: \n", __LINE__);                     \
+		return -1;                                                    \
+	}                                                                     \
+} while(0)
+#include <rte_random.h>
+#include <rte_common.h>
+#include <rte_timer.h>
 
-struct rte_rand_state {
-	uint64_t z1;
-	uint64_t z2;
-	uint64_t z3;
-	uint64_t z4;
-	uint64_t z5;
-} __rte_cache_aligned;
-
-static struct rte_rand_state rand_states[RTE_MAX_LCORE];
-
-static uint32_t
-__rte_rand_lcg32(uint32_t *seed)
+static int
+test_lpm6_perf(void)
 {
-	*seed = 1103515245U * *seed + 12345U;
+	struct rte_lpm6 *lpm = NULL;
+	struct rte_lpm6_config config;
+	uint64_t begin, total_time;
+	unsigned i, j;
+	uint32_t next_hop_add = 0xAA, next_hop_return = 0;
+	int status = 0;
+	int64_t count = 0;
 
-	return *seed;
-}
+	config.max_rules = 1000000;
+	config.number_tbl8s = NUMBER_TBL8S;
+	config.flags = 0;
 
-static uint64_t
-__rte_rand_lcg64(uint32_t *seed)
-{
-	uint64_t low;
-	uint64_t high;
+	rte_srand(rte_rdtsc());
 
-	/* A 64-bit LCG would have been much cleaner, but good
-	 * multiplier/increments for such seem hard to come by.
+	printf("No. routes = %u\n", (unsigned) NUM_ROUTE_ENTRIES);
+
+	print_route_distribution(large_route_table, (uint32_t) NUM_ROUTE_ENTRIES);
+
+	/* Only generate IPv6 address of each item in large IPS table,
+	 * here next_hop is not needed.
 	 */
+	generate_large_ips_table(0);
 
-	low = __rte_rand_lcg32(seed);
-	high = __rte_rand_lcg32(seed);
+	lpm = rte_lpm6_create(__func__, SOCKET_ID_ANY, &config);
+	TEST_LPM_ASSERT(lpm != NULL);
 
-	return low | (high << 32);
+	/* Measure add. */
+	begin = rte_rdtsc();
+
+	for (i = 0; i < NUM_ROUTE_ENTRIES; i++) {
+		if (rte_lpm6_add(lpm, large_route_table[i].ip,
+				 large_route_table[i].depth, large_route_table[i].next_hop) == 0)
+		    status++;
+
+	}
+	/* End Timer. */
+	total_time = rte_rdtsc() - begin;
+
+	printf("Unique added entries = %d\n", status);
+	printf("Average LPM Add: %g cycles\n",
+			(double)total_time / NUM_ROUTE_ENTRIES);
+
+	/* Measure single Lookup */
+	total_time = 0;
+	count = 0;
+
+	for (i = 0; i < ITERATIONS; i ++) {
+		begin = rte_rdtsc();
+
+		for (j = 0; j < NUM_IPS_ENTRIES; j ++) {
+			if (rte_lpm6_lookup(lpm, large_ips_table[j].ip,
+					&next_hop_return) != 0)
+				count++;
+		}
+
+		total_time += rte_rdtsc() - begin;
+
+	}
+	printf("Average LPM Lookup: %.1f cycles (fails = %.1f%%)\n",
+			(double)total_time / ((double)ITERATIONS * BATCH_SIZE),
+			(count * 100.0) / (double)(ITERATIONS * BATCH_SIZE));
+
+	/* Measure bulk Lookup */
+	total_time = 0;
+	count = 0;
+
+	uint8_t ip_batch[NUM_IPS_ENTRIES][16];
+	int32_t next_hops[NUM_IPS_ENTRIES];
+
+	for (i = 0; i < NUM_IPS_ENTRIES; i++)
+		memcpy(ip_batch[i], large_ips_table[i].ip, 16);
+
+	for (i = 0; i < ITERATIONS; i ++) {
+
+		/* Lookup per batch */
+		begin = rte_rdtsc();
+		rte_lpm6_lookup_bulk_func(lpm, ip_batch, next_hops, NUM_IPS_ENTRIES);
+		total_time += rte_rdtsc() - begin;
+
+		for (j = 0; j < NUM_IPS_ENTRIES; j++)
+			if (next_hops[j] < 0)
+				count++;
+	}
+	printf("BULK LPM Lookup: %.1f cycles (fails = %.1f%%)\n",
+			(double)total_time / ((double)ITERATIONS * BATCH_SIZE),
+			(count * 100.0) / (double)(ITERATIONS * BATCH_SIZE));
+
+	/* Delete */
+	status = 0;
+	begin = rte_rdtsc();
+
+	for (i = 0; i < NUM_ROUTE_ENTRIES; i++) {
+		/* rte_lpm_delete(lpm, ip, depth) */
+		status += rte_lpm6_delete(lpm, large_route_table[i].ip,
+				large_route_table[i].depth);
+	}
+
+	total_time += rte_rdtsc() - begin;
+
+	printf("Average LPM Delete: %g cycles\n",
+			(double)total_time / NUM_ROUTE_ENTRIES);
+
+	rte_lpm6_delete_all(lpm);
+	rte_lpm6_free(lpm);
+
+	return 0;
 }
 
-static uint64_t
-__rte_rand_lfsr258_gen_seed(uint32_t *seed, uint64_t min_value)
+
+/*
+ * Creates two different LPM tables. Tries to create a third one with the same
+ * name as the first one and expects the create function to return the same
+ * pointer.
+ */
+static int32_t test1(void)
 {
-	uint64_t res;
+	struct rte_lpm6 *lpm1 = NULL, *lpm2 = NULL, *lpm3 = NULL;
+	struct rte_lpm6_config config;
 
-	res = __rte_rand_lcg64(seed);
+	config.max_rules = MAX_RULES;
+	config.number_tbl8s = NUMBER_TBL8S;
+	config.flags = 0;
 
-	if (res < min_value)
-		res += min_value;
+	/* rte_lpm6_create: lpm name == LPM1 */
+	lpm1 = rte_lpm6_create("LPM1", SOCKET_ID_ANY, &config);
+	TEST_LPM_ASSERT(lpm1 != NULL);
 
-	return res;
+	/* rte_lpm6_create: lpm name == LPM2 */
+	lpm2 = rte_lpm6_create("LPM2", SOCKET_ID_ANY, &config);
+	TEST_LPM_ASSERT(lpm2 != NULL);
+
+	/* /\* rte_lpm6_create: lpm name == LPM2 *\/ */
+	/* lpm3 = rte_lpm6_create("LPM1", SOCKET_ID_ANY, &config); */
+	/* TEST_LPM_ASSERT(lpm3 == NULL); */
+
+	rte_lpm6_free(lpm1);
+	rte_lpm6_free(lpm2);
+
+	return PASS;
 }
-
-static void
-__rte_srand_lfsr258(uint64_t seed, struct rte_rand_state *state)
+#include <multibit_dpdk.h>
+//#include <OMAR_dpdk_lpm6.h>
+/*
+ * Creates two different LPM tables. Tries to create a third one with the same
+ * name as the first one and expects the create function to return the same
+ * pointer.
+ */
+static int32_t test2(void)
 {
-	uint32_t lcg_seed;
+        struct multibit_rte_lpm6 *lpm1 = NULL;
+	struct multibit_rte_lpm6_config config;
 
-	lcg_seed = (uint32_t)(seed ^ (seed >> 32));
+	config.max_rules = MAX_RULES;
+	config.number_tbl8s = NUMBER_TBL8S;
+	config.flags = 0;
 
-	state->z1 = __rte_rand_lfsr258_gen_seed(&lcg_seed, 2UL);
-	state->z2 = __rte_rand_lfsr258_gen_seed(&lcg_seed, 512UL);
-	state->z3 = __rte_rand_lfsr258_gen_seed(&lcg_seed, 4096UL);
-	state->z4 = __rte_rand_lfsr258_gen_seed(&lcg_seed, 131072UL);
-	state->z5 = __rte_rand_lfsr258_gen_seed(&lcg_seed, 8388608UL);
+	/* rte_lpm6_create: lpm name == LPM1 */
+	lpm1 = multibit_rte_lpm6_create("LPM1", SOCKET_ID_ANY, &config);
+	TEST_LPM_ASSERT(lpm1 != NULL);
+	uint8_t routes[][16]=
+	    {
+		{0xa,0xb,0xc,0x0,0xf,0,0,0,0,0,0,0,0,0,0,0},
+		{0xa,0xb,0xc,0x0,0xf,0,0,0,0,0,0,0,0,0,0,0},
+		{0xa,0xb,0xc,0x0,0xf,0xff,0,0,0,0,0,0,0,0,0,0},
+		{0xc,0xd,0xc,0xd,0xf,0xff,0,0,0,0,0,0,0,0,0,0},
+		{0xc,0xc,0xc,0xd,0xf,0xff,0,0,0,0,0,0,0,0,0,0}
+	    };
+
+        //rte_lpm6_add(lpm1, routes[0], 42, 10);
+//	rte_lpm6_add(lpm1, routes[0], 43, 20);
+
+	multibit_rte_lpm6_add(lpm1, routes[0], 44, 90);
+	multibit_rte_lpm6_add(lpm1, routes[0], 45, 80);
+	/* rte_lpm6_add(lpm1, routes[0], 27, 120); */
+	/* rte_lpm6_add(lpm1, routes[0], 28, 120); */
+	//rte_lpm6_add(lpm1, routes[4], 49, 120);
+	/* rte_lpm6_add(lpm1, routes[0], 46, 70); */
+	/* rte_lpm6_add(lpm1, routes[0], 47, 60); */
+	/* rte_lpm6_add(lpm1, routes[0], 48, 50); */
+	/* rte_lpm6_add(lpm1, routes[3], 48, 50); */
+	/* rte_lpm6_add(lpm1, routes[4], 48, 50); */
+	/* rte_lpm6_add(lpm1, routes[2], 47, 50); */
+	/* rte_lpm6_add(lpm1, routes[2], 18, 18); */
+	uint8_t lookups[2][16]=
+	    {
+		{0xa,0xb,0xc,0x0,0xf,8,0,0,0,0,0,0,0,0,0,0},
+		{0xa,0xb,0xc,0x0,0xf,4,0,0,0,0,0,0,0,0,0,0},
+	    };
+	uint32_t nexthop[2];
+	multibit_rte_lpm6_lookup(lpm1, lookups[0], &nexthop[0]);
+	multibit_rte_lpm6_lookup(lpm1, lookups[1], &nexthop[1]);
+	std::cout <<"Lookup first: \n"
+		  << getStrIpv6(lookups[0]) <<'\n'
+		  << nexthop[0] <<'\n'
+		  << "Lookup second: \n"
+		  << getStrIpv6(lookups[1]) <<'\n'
+		  << nexthop[1] <<'\n';
+
+	multibit_rte_lpm6_free(lpm1);
+
+	return PASS;
 }
-#define RTE_MAX_LCORE 8
-void
-rte_srand(uint64_t seed)
+
+
+static inline uint8_t
+bits_in_nh(uint8_t nh_sz)
 {
-	unsigned int lcore_id;
-
-	/* add lcore_id to seed to avoid having the same sequence */
-	for (lcore_id = 0; lcore_id < RTE_MAX_LCORE; lcore_id++)
-		__rte_srand_lfsr258(seed + lcore_id, &rand_states[lcore_id]);
+	return 8 * (1 << nh_sz);
 }
+
+static inline uint64_t
+get_max_nh(uint8_t nh_sz)
+{
+	return ((1ULL << (bits_in_nh(nh_sz) - 1)) - 1);
+}
+#include <fib6/OMAR_dpdk_fib6.h>
+#define TEST_FIB_ASSERT(cond) do {				\
+	if (!(cond)) {						\
+		printf("Error at line %d:\n", __LINE__);	\
+		return -1;					\
+	}							\
+} while (0)
 
 static int
 test_fib6_perf(void)
 {
-    fx_trie::Fx_trie trie;
-	/* struct rte_fib6 *fib = NULL; */
-	/* struct rte_fib6_conf conf; */
-	 uint64_t begin, total_time; 
+	struct rte_fib6 *fib = NULL;
+	struct rte_fib6_conf conf;
+	uint64_t begin, total_time;
 	unsigned int i, j;
-	uint32_t next_hop_add;
+	uint64_t next_hop_add;
 	int status = 0;
 	int64_t count = 0;
 	uint8_t ip_batch[NUM_IPS_ENTRIES][16];
-	uint32_t next_hops[NUM_IPS_ENTRIES];
+	uint64_t next_hops[NUM_IPS_ENTRIES];
 
-	/* conf.type = RTE_FIB6_TRIE; */
-	/* conf.default_nh = 0; */
-	/* conf.max_routes = 1000000; */
-	/* conf.rib_ext_sz = 0; */
-	/* conf.trie.nh_sz = RTE_FIB6_TRIE_4B; */
-	/* conf.trie.num_tbl8 = RTE_MIN(get_max_nh(conf.trie.nh_sz), 1000000U); */
+	conf.type = RTE_FIB6_TRIE;
+	conf.default_nh = 0;
+	conf.max_routes = 1000000;
+	conf.rib_ext_sz = 0;
+	conf.trie.nh_sz = RTE_FIB6_TRIE_4B;
+	conf.trie.num_tbl8 = RTE_MIN(get_max_nh(conf.trie.nh_sz), 100000U);
 
 	rte_srand(rte_rdtsc());
 
@@ -1301,18 +1442,19 @@ test_fib6_perf(void)
 	/* Only generate IPv6 address of each item in large IPS table,
 	 * here next_hop is not needed.
 	 */
-	generate_large_ips_table(0);
+	//generate_large_ips_table(0);
+
+	fib = rte_fib6_create(__func__, SOCKET_ID_ANY, &conf);
+	TEST_FIB_ASSERT(fib != NULL);
 
 	/* Measure add. */
 	begin = rte_rdtsc();
-#define NUM_ROUTE_ENTRIES 2
+
 	for (i = 0; i < NUM_ROUTE_ENTRIES; i++) {
 		next_hop_add = (i & ((1 << 14) - 1)) + 1;
-		if(trie.insert(large_route_table[i].ip, large_route_table[i].depth, next_hop_add) == true)
-		    status++;
-		/* if (rte_fib6_add(fib, large_route_table[i].ip, */
-		/* 		large_route_table[i].depth, next_hop_add) == 0) */
-
+		if (rte_fib6_add(fib, large_route_table[i].ip,
+				large_route_table[i].depth, next_hop_add) == 0)
+			status++;
 	}
 	/* End Timer. */
 	total_time = rte_rdtsc() - begin;
@@ -1324,7 +1466,7 @@ test_fib6_perf(void)
 	/* Measure bulk Lookup */
 	total_time = 0;
 	count = 0;
-#define NUM_IPS_ENTRIES 2
+
 	for (i = 0; i < NUM_IPS_ENTRIES; i++)
 		memcpy(ip_batch[i], large_ips_table[i].ip, 16);
 
@@ -1332,10 +1474,7 @@ test_fib6_perf(void)
 
 		/* Lookup per batch */
 		begin = rte_rdtsc();
-		for(j=0; j < NUM_IPS_ENTRIES; ++j)
-		{
-		    next_hops[j] = trie.lookup(ip_batch[j]);
-		}
+		rte_fib6_lookup_bulk(fib, ip_batch, next_hops, NUM_IPS_ENTRIES);
 		total_time += rte_rdtsc() - begin;
 
 		for (j = 0; j < NUM_IPS_ENTRIES; j++)
@@ -1350,18 +1489,18 @@ test_fib6_perf(void)
 	status = 0;
 	begin = rte_rdtsc();
 
-	/* for (i = 0; i < NUM_ROUTE_ENTRIES; i++) { */
-	/* 	/\* rte_fib_delete(fib, ip, depth) *\/ */
-	/* 	status += rte_fib6_delete(fib, large_route_table[i].ip, */
-	/* 			large_route_table[i].depth); */
-	/* } */
+	for (i = 0; i < NUM_ROUTE_ENTRIES; i++) {
+		/* rte_fib_delete(fib, ip, depth) */
+		status += rte_fib6_delete(fib, large_route_table[i].ip,
+				large_route_table[i].depth);
+	}
 
 	total_time = rte_rdtsc() - begin;
 
-	/* printf("Average FIB Delete: %g cycles\n", */
-	/* 		(double)total_time / NUM_ROUTE_ENTRIES); */
+	printf("Average FIB Delete: %g cycles\n",
+			(double)total_time / NUM_ROUTE_ENTRIES);
 
-	/* rte_fib6_free(fib); */
+	rte_fib6_free(fib);
 
 	return 0;
 }

@@ -211,6 +211,15 @@ static std::string getStrIpv6Hex(u_char *ip)
     }
     return str.str();
 }
+static std::string getStrIpv6Dec(u_char *ip)
+{
+    std::stringstream str;
+    for(int i=0; i < 16; i++)
+    {
+	str << (int)(ip[i]) << ":";
+    }
+    return str.str();
+}
 
 struct ipv6_addr
 {
