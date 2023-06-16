@@ -1,0 +1,20 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/g++",
+      "-c",
+      "-g",
+      "-std=gnu++2b",
+      "-DLOG_DEBUG",
+      "-I./tries/",
+      "-I./helpers/",
+      "-I./test/",
+      "-o",
+      "main",
+      "main.cpp"
+    ],
+    "directory": "/home/omar/some_shit/tries",
+    "file": "/home/omar/some_shit/tries/main.cpp",
+    "output": "/home/omar/some_shit/tries/main"
+  }
+]
