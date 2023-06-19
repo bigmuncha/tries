@@ -1,0 +1,139 @@
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: VFIO support initialized
+TELEMETRY: No legacy callbacks, legacy socket not created
+No. routes = 50000
+Unique added entries = 49772
+Average LPM Add: 467395 cycles
+ Stop dataset: DPDK_LPM_1/1 11.1531 fails: 2
+ Stop dataset: DPDK_LPM_2/2 11.0305 fails: 2
+ Stop dataset: DPDK_LPM_5/2 11.0439 fails: 2
+ Stop dataset: DPDK_LPM_5/5 11.0307 fails: 2
+ Stop dataset: DPDK_LPM_10/3 11.0345 fails: 2
+ Stop dataset: DPDK_LPM_20/5 11.2137 fails: 2
+Average LPM Delete: 42508.4 cycles
+NEXT
+
+Alloc for tlb8 pool: 2000000
+Alloc for tlb8 memory: 512001152
+Unique added entries = 49772
+Average LPM Add: 367609 cycles
+ Stop dataset: FX_PLAIN_1/1 14.2449 fails: 2
+ Stop dataset: FX_PLAIN_2/2 14.084 fails: 2
+ Stop dataset: FX_PLAIN_5/2 14.2456 fails: 2
+ Stop dataset: FX_PLAIN_5/5 14.0491 fails: 2
+ Stop dataset: FX_PLAIN_10/3 14.0517 fails: 2
+ Stop dataset: FX_PLAIN_20/5 14.0513 fails: 2
+ Stop dataset: FX_BRANCH_1/1 14.1224 fails: 2
+ Stop dataset: FX_BRANCH_2/2 14.2443 fails: 2
+ Stop dataset: FX_BRANCH_5/2 14.1053 fails: 2
+ Stop dataset: FX_BRANCH_5/5 14.1595 fails: 2
+ Stop dataset: FX_BRANCH_10/3 14.0431 fails: 2
+ Stop dataset: FX_BRANCH_20/5 14.0427 fails: 2
+ Stop dataset: FX_PREFETCH_1/1 21.2653 fails: 2
+ Stop dataset: FX_PREFETCH_2/2 21.0763 fails: 2
+ Stop dataset: FX_PREFETCH_5/2 21.2018 fails: 2
+ Stop dataset: FX_PREFETCH_5/5 21.0491 fails: 2
+ Stop dataset: FX_PREFETCH_10/3 21.431 fails: 2
+ Stop dataset: FX_PREFETCH_20/5 21.3932 fails: 2
+ Stop dataset: FX_CACHE_1/1 16.8163 fails: 2
+ Stop dataset: FX_CACHE_2/2 13.1298 fails: 2
+ Stop dataset: FX_CACHE_5/2 15.1228 fails: 2
+ Stop dataset: FX_CACHE_5/5 10.7239 fails: 2
+ Stop dataset: FX_CACHE_10/3 15.1034 fails: 2
+ Stop dataset: FX_CACHE_20/5 15.0684 fails: 2
+Average LPM Delete: 33949.3 cycles
+current pos: 0 number all: 500000
+NEXT
+
+No. routes = 50000
+Unique added entries = 49828
+Average LPM Add: 617500 cycles
+ Stop dataset: DPDK_LPM_1/1 17.2347 fails: 2
+ Stop dataset: DPDK_LPM_2/2 17.3435 fails: 2
+ Stop dataset: DPDK_LPM_5/2 17.1754 fails: 2
+ Stop dataset: DPDK_LPM_5/5 17.3067 fails: 2
+ Stop dataset: DPDK_LPM_10/3 17.1552 fails: 2
+ Stop dataset: DPDK_LPM_20/5 17.1538 fails: 2
+Average LPM Delete: 58143.1 cycles
+NEXT
+
+Alloc for tlb8 pool: 2000000
+Alloc for tlb8 memory: 512001152
+Unique added entries = 49828
+Average LPM Add: 521073 cycles
+ Stop dataset: FX_PLAIN_1/1 21.3265 fails: 2
+ Stop dataset: FX_PLAIN_2/2 21.3206 fails: 2
+ Stop dataset: FX_PLAIN_5/2 21.0877 fails: 2
+ Stop dataset: FX_PLAIN_5/5 21.3558 fails: 2
+ Stop dataset: FX_PLAIN_10/3 22.75 fails: 2
+ Stop dataset: FX_PLAIN_20/5 21.4444 fails: 2
+ Stop dataset: FX_BRANCH_1/1 21.1633 fails: 2
+ Stop dataset: FX_BRANCH_2/2 21.0916 fails: 2
+ Stop dataset: FX_BRANCH_5/2 21.193 fails: 2
+ Stop dataset: FX_BRANCH_5/5 21.2945 fails: 2
+ Stop dataset: FX_BRANCH_10/3 21.1466 fails: 2
+ Stop dataset: FX_BRANCH_20/5 21.3077 fails: 2
+ Stop dataset: FX_PREFETCH_1/1 31.949 fails: 2
+ Stop dataset: FX_PREFETCH_2/2 32.2061 fails: 2
+ Stop dataset: FX_PREFETCH_5/2 31.8509 fails: 2
+ Stop dataset: FX_PREFETCH_5/5 31.865 fails: 2
+ Stop dataset: FX_PREFETCH_10/3 32.1897 fails: 2
+ Stop dataset: FX_PREFETCH_20/5 31.9829 fails: 2
+ Stop dataset: FX_CACHE_1/1 23.3163 fails: 2
+ Stop dataset: FX_CACHE_2/2 18.0382 fails: 2
+ Stop dataset: FX_CACHE_5/2 20.2719 fails: 2
+ Stop dataset: FX_CACHE_5/5 14.1779 fails: 2
+ Stop dataset: FX_CACHE_10/3 20.3448 fails: 2
+ Stop dataset: FX_CACHE_20/5 20.1026 fails: 2
+Average LPM Delete: 47204.3 cycles
+current pos: 0 number all: 500000
+NEXT
+
+No. routes = 50000
+Unique added entries = 49771
+Average LPM Add: 942037 cycles
+ Stop dataset: DPDK_LPM_1/1 36.1837 fails: 2
+ Stop dataset: DPDK_LPM_2/2 38.7252 fails: 2
+ Stop dataset: DPDK_LPM_5/2 41.2807 fails: 2
+ Stop dataset: DPDK_LPM_5/5 41.2638 fails: 2
+ Stop dataset: DPDK_LPM_10/3 41.181 fails: 2
+ Stop dataset: DPDK_LPM_20/5 41.6581 fails: 2
+Average LPM Delete: 82937.2 cycles
+NEXT
+
+Alloc for tlb8 pool: 2000000
+Alloc for tlb8 memory: 512001152
+Unique added entries = 49771
+Average LPM Add: 840520 cycles
+ Stop dataset: FX_PLAIN_1/1 43.4694 fails: 2
+ Stop dataset: FX_PLAIN_2/2 43.0992 fails: 2
+ Stop dataset: FX_PLAIN_5/2 43.2193 fails: 2
+ Stop dataset: FX_PLAIN_5/5 44.9264 fails: 2
+ Stop dataset: FX_PLAIN_10/3 43.1207 fails: 2
+ Stop dataset: FX_PLAIN_20/5 43.2222 fails: 2
+ Stop dataset: FX_BRANCH_1/1 43.1122 fails: 2
+ Stop dataset: FX_BRANCH_2/2 43.0763 fails: 2
+ Stop dataset: FX_BRANCH_5/2 43.1228 fails: 2
+ Stop dataset: FX_BRANCH_5/5 51.3374 fails: 2
+ Stop dataset: FX_BRANCH_10/3 43.9224 fails: 2
+ Stop dataset: FX_BRANCH_20/5 43.2821 fails: 2
+ Stop dataset: FX_PREFETCH_1/1 61.0918 fails: 2
+ Stop dataset: FX_PREFETCH_2/2 61 fails: 2
+ Stop dataset: FX_PREFETCH_5/2 61.1404 fails: 2
+ Stop dataset: FX_PREFETCH_5/5 61.1166 fails: 2
+ Stop dataset: FX_PREFETCH_10/3 61.0259 fails: 2
+ Stop dataset: FX_PREFETCH_20/5 69.3846 fails: 2
+ Stop dataset: FX_CACHE_1/1 50.0306 fails: 2
+ Stop dataset: FX_CACHE_2/2 34.0992 fails: 2
+ Stop dataset: FX_CACHE_5/2 38.2632 fails: 2
+ Stop dataset: FX_CACHE_5/5 27.0613 fails: 2
+ Stop dataset: FX_CACHE_10/3 38.681 fails: 2
+ Stop dataset: FX_CACHE_20/5 38.1538 fails: 2
+Average LPM Delete: 65253 cycles
+current pos: 0 number all: 500000
+NEXT
+

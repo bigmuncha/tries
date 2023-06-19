@@ -1,5 +1,6 @@
 #include "ipcreator.h"
 #include <cstdint>
+#include <cstring>
 #include <stdint.h>
 #include <sys/types.h>
 #include <rte_lpm6.h>
@@ -147,10 +148,11 @@ static void generate_long_ip_table(int size)
 } while(0)
 #include <rte_random.h>
 #include <rte_common.h>
-
+#include <map>
 
 static int
-test_lpm6_perf(std::vector<rules_tbl_entry> &vector_rules, std::vector<ips_tbl_entry> &vector_ips)
+test_lpm6_perf( std::vector<rules_tbl_entry> &vector_rules,
+	       std::vector<std::pair<std::string, std::vector< ips_tbl_entry>>> &vector_ips, std::vector<std::pair<std::string, double>>& statistic)
 {
 	struct rte_lpm6 *lpm = NULL;
 	struct rte_lpm6_config config;
@@ -185,68 +187,48 @@ test_lpm6_perf(std::vector<rules_tbl_entry> &vector_rules, std::vector<ips_tbl_e
 	printf("Unique added entries = %d\n", status);
 	printf("Average LPM Add: %g cycles\n",
 	       (double)total_time / vector_rules.size());
-
-	/* Measure single Lookup */
-	total_time = 0;
-	count = 0;
-
-	for (i = 0; i < ITERATIONS; i ++) {
-		begin = rte_rdtsc();
-		for (j = 0; j < vector_ips.size(); j ++) {
-			if (rte_lpm6_lookup(lpm, vector_ips[j].ip,
-					&next_hop_return) != 0)
-				count++;
-		}
-
-		total_time += rte_rdtsc() - begin;
-
-	}
-	printf("Average LPM Lookup: %.1f cycles (fails = %.1f%%)\n",
-	       (double)total_time / ((double)ITERATIONS * vector_ips.size()),
-	       (count * 100.0) / (double)(ITERATIONS * vector_ips.size()));
-
+//// START PROCESSING
 	/* Measure bulk Lookup */
-	total_time = 0;
-	count = 0;
 
-	uint8_t ip_batch[vector_ips.size()][16];
-	int32_t next_hops[vector_ips.size()];
-
-	for (i = 0; i < vector_ips.size();i++)
+	for(auto &[name,lookup_ip]: vector_ips)
 	{
-	    memcpy(ip_batch[i],   vector_ips[i].ip, 16);
-	    //memcpy(ip_batch[i+2],   large_ips_table[j].ip, 16);
-	}
-	for (i = 0; i < ITERATIONS; i ++) {
-	    begin = rte_rdtsc();
-	    for (j = 0; j < vector_ips.size(); j ++) {
-		if (rte_lpm6_lookup(lpm, ip_batch[j],
-				    &next_hops[j]) != 0)
-		    count++;
-	    }
-	    total_time += rte_rdtsc() - begin;
-	}
-	printf("Average LPM Lookup: %.1f cycles (fails = %.1f%%)\n",
-	       (double)total_time / ((double)ITERATIONS * vector_ips.size()),
-	       (count * 100.0) / (double)(ITERATIONS * vector_ips.size()));
+	    static constexpr int batch_size = 1024;
+	    uint8_t ip_batch[batch_size][16];
+	    int32_t next_hops[batch_size];
+	    int32_t expect_next_hops[batch_size];
+	    int iterations = 0;
+	    uint64_t big_time = 0;
+	    count = 0;
+            for(int i =0; i < lookup_ip.size();)
+	    {
+		//collect ip in batch_array
+		for(int j =0; j < batch_size; j++)
+		{
+		    if (i > lookup_ip.size())
+			break;
+		    memcpy(ip_batch[j], lookup_ip[i].ip, RTE_LPM6_IPV6_ADDR_SIZE);
+		    expect_next_hops[j] = lookup_ip[i].next_hop;
+		    i++;
+		}
+		memset(next_hops,0, sizeof(next_hops));
+		total_time = 0;
 
-	total_time = 0;
-	count = 0;
-
-	for (i = 0; i < ITERATIONS; i ++) {
-		/* Lookup per batch */
 		begin = rte_rdtsc();
-		rte_lpm6_lookup_bulk_func(lpm, ip_batch, next_hops, vector_ips.size());
+		rte_lpm6_lookup_bulk_func(lpm, ip_batch, next_hops, batch_size);
+		iterations++;
 		total_time += rte_rdtsc() - begin;
-
-		for (j = 0; j < vector_ips.size(); j++)
-			if (next_hops[j] != vector_ips[j].next_hop)
-				count++;
+//		std::cout << "current time: " <<  (double)total_time / (double)batch_size<<"\n";
+		big_time+=total_time / batch_size;
+		for (int k = 0; k < batch_size; k++)
+		    if (next_hops[k] != expect_next_hops[k])
+			count++;
+	    }
+	    statistic.push_back({"DPDK_LPM_" + name, ((double)big_time / (double)iterations)});
+	    std::cout << " Stop dataset: " << statistic.back().first << ' ' << statistic.back().second << " fails: " << count<< '\n';
 	}
-	printf("BULK LPM Lookup: %.1f cycles (fails = %.1f%%)\n",
-	       (double)total_time / ((double)ITERATIONS * vector_ips.size()),
-	       (count * 100.0) / (double)(ITERATIONS * vector_ips.size()));
 
+
+	/////STOP PROCESSIING
 	/* Delete */
 	status = 0;
 	begin = rte_rdtsc();
@@ -272,8 +254,10 @@ test_lpm6_perf(std::vector<rules_tbl_entry> &vector_rules, std::vector<ips_tbl_e
 
 #include <multibit_dpdk.h>
 #include <vector>
+#include <map>
 static int
-test_multibit_perf(std::vector<rules_tbl_entry> &vector_rules, std::vector<ips_tbl_entry> &vector_ips)
+test_multibit_perf(std::vector<rules_tbl_entry> &vector_rules,
+		   std::vector<std::pair<std::string,std::vector<ips_tbl_entry>>> &vector_ips, std::vector<std::pair<std::string, double>> statistic)
 {
 	struct multibit_rte_lpm6 *lpm = NULL;
 	struct multibit_rte_lpm6_config config;
@@ -283,11 +267,9 @@ test_multibit_perf(std::vector<rules_tbl_entry> &vector_rules, std::vector<ips_t
 	int status = 0;
 	int64_t count = 0;
 
-	config.max_rules = 1000000;
-	config.number_tbl8s = 1 << 19 ;
+	config.max_rules = 100000;
+	config.number_tbl8s = 500000 ;
 	config.flags = 0;
-
-	rte_srand(rte_rdtsc());
 
 	/* Only generate IPv6 address of each item in large IPS table,
 	 * here next_hop is not needed.
@@ -310,108 +292,150 @@ test_multibit_perf(std::vector<rules_tbl_entry> &vector_rules, std::vector<ips_t
 	printf("Average LPM Add: %g cycles\n",
 	       (double)total_time / vector_rules.size());
 
-	/* Measure single Lookup */
-	total_time = 0;
-	count = 0;
-
-	for (i = 0; i < ITERATIONS; i ++) {
-		begin = rte_rdtsc();
-		for (j = 0; j < vector_ips.size(); j ++) {
-			if (multibit_rte_lpm6_lookup(lpm, vector_ips[j].ip,
-					&next_hop_return) != 0)
-				count++;
-		}
-
-		total_time += rte_rdtsc() - begin;
-
-	}
-	printf("Average LPM Lookup: %.1f cycles (fails = %.1f%%)\n",
-	       (double)total_time / ((double)ITERATIONS * vector_ips.size()),
-	       (count * 100.0) / (double)(ITERATIONS * vector_ips.size()));
-
-	/* Measure bulk Lookup */
-	total_time = 0;
-	count = 0;
-
-	 uint8_t ip_batch[vector_ips.size()][16];
-	 int32_t next_hops[vector_ips.size()];
-
-	for (i = 0; i < vector_ips.size();i++)
+	for(auto &[name, lookup_ip]: vector_ips)
 	{
-	    memcpy(ip_batch[i],   vector_ips[i].ip, 16);
-	    //memcpy(ip_batch[i+2],   large_ips_table[j].ip, 16);
-	}
+	    static constexpr int batch_size = 1024;
+	    uint8_t ip_batch[batch_size][16];
+	    int32_t next_hops[batch_size];
+	    int32_t expect_next_hops[batch_size];
+	    int iterations = 0;
+	    uint64_t big_time = 0;
+	    count = 0;
+            for(int i =0; i < lookup_ip.size();)
+	    {
+		//collect ip in batch_array
+		for(int j =0; j < batch_size; j++)
+		{
+		    if (i > lookup_ip.size())
+			break;
+		    memcpy(ip_batch[j], lookup_ip[i].ip, RTE_LPM6_IPV6_ADDR_SIZE);
+		    expect_next_hops[j] = lookup_ip[i].next_hop;
+		    i++;
+		}
+		memset(next_hops,0, sizeof(next_hops));
+		total_time = 0;
 
-	for (i = 0; i < ITERATIONS; i ++) {
-		/* Lookup per batch */
 		begin = rte_rdtsc();
-		multibit_rte_lpm6_lookup_bulk_func(lpm, ip_batch, next_hops, vector_ips.size());
+		multibit_rte_lpm6_lookup_bulk_func(lpm, ip_batch, next_hops, batch_size);
+		iterations++;
 		total_time += rte_rdtsc() - begin;
-
-		for (j = 0; j < vector_ips.size(); j++)
-		    if (next_hops[j] != vector_ips[j].next_hop)
-				count++;
+		//std::cout << "current time: " <<  (double)total_time / (double)batch_size<<"\n";
+		big_time+=total_time / batch_size;
+		for (int k = 0; k < batch_size; k++)
+		    if (next_hops[k] != expect_next_hops[k])
+			count++;
+	    }
+	    statistic.push_back({"FX_PLAIN_" + name, ((double)big_time / (double)iterations)});
+	    std::cout << " Stop dataset: " << statistic.back().first << ' ' << statistic.back().second <<" fails: "<< count << '\n' ;
 	}
-	printf("BULK LPM Lookup: %.1f cycles (fails = %.1f%%)\n",
-	       (double)total_time / ((double)ITERATIONS * vector_ips.size()),
-	       (count * 100.0) / (double)(ITERATIONS * vector_ips.size()));
 
-	memset(next_hops, 0, sizeof(next_hops));
-	/* Measure bulk Lookup */
-	total_time = 0;
-	count = 0;
-
-	for (i = 0; i < ITERATIONS; i ++) {
-		/* Lookup per batch */
+	for(auto &[name, lookup_ip]: vector_ips)
+	{
+	    static constexpr int batch_size = 1024;
+	    uint8_t ip_batch[batch_size][16];
+	    int32_t next_hops[batch_size];
+	    int32_t expect_next_hops[batch_size];
+	    int iterations = 0;
+	    count = 0;
+	    uint64_t big_time = 0;
+            for(int i =0; i < lookup_ip.size();)
+	    {
+		//collect ip in batch_array
+		for(int j =0; j < batch_size; j++)
+		{
+		    if (i > lookup_ip.size())
+			break;
+		    memcpy(ip_batch[j], lookup_ip[i].ip, RTE_LPM6_IPV6_ADDR_SIZE);
+		    expect_next_hops[j] = lookup_ip[i].next_hop;
+		    i++;
+		}
+		memset(next_hops,0, sizeof(next_hops));
+		total_time = 0;
 		begin = rte_rdtsc();
-		multibit_rte_lpm6_lookup_bulk_func_branch(lpm, ip_batch, next_hops, vector_ips.size());
+		multibit_rte_lpm6_lookup_bulk_func_branch(lpm, ip_batch, next_hops, batch_size);
+		iterations++;
 		total_time += rte_rdtsc() - begin;
-
-		for (j = 0; j < vector_ips.size(); j++)
-			if (next_hops[j] != vector_ips[j].next_hop)
-				count++;
+		//std::cout << "current time: " <<  (double)total_time / (double)batch_size<<"\n";
+		big_time+=total_time / batch_size;
+		for (int k = 0; k < batch_size; k++)
+		    if (next_hops[k] != expect_next_hops[k])
+			count++;
+	    }
+	    statistic.push_back({"FX_BRANCH_" + name, ((double)big_time / (double)iterations)});
+	    std::cout << " Stop dataset: " << statistic.back().first << ' ' << statistic.back().second <<" fails: "<< count << '\n' ;
 	}
-	printf("BULK BRANCH LPM Lookup: %.1f cycles (fails = %.1f%%)\n",
-	       (double)total_time / ((double)ITERATIONS * vector_ips.size()),
-	       (count * 100.0) / (double)(ITERATIONS * vector_ips.size()));
 
-		/* Measure bulk Lookup */
-	total_time = 0;
-	count = 0;
-
-	memset(next_hops, 0, sizeof(next_hops));
-	for (i = 0; i < ITERATIONS; i ++) {
-		/* Lookup per batch */
+	for(auto &[name, lookup_ip]: vector_ips)
+	{
+	    static constexpr int batch_size = 1024;
+	    uint8_t ip_batch[batch_size][16];
+	    int32_t next_hops[batch_size];
+	    int32_t expect_next_hops[batch_size];
+	    int iterations = 0;
+	    uint64_t big_time = 0;
+	    count = 0;
+            for(int i =0; i < lookup_ip.size();)
+	    {
+		//collect ip in batch_array
+		for(int j =0; j < batch_size; j++)
+		{
+		    if (i > lookup_ip.size())
+			break;
+		    memcpy(ip_batch[j], lookup_ip[i].ip, RTE_LPM6_IPV6_ADDR_SIZE);
+		    expect_next_hops[j] = lookup_ip[i].next_hop;
+		    i++;
+		}
+		memset(next_hops,0, sizeof(next_hops));
+		total_time = 0;
 		begin = rte_rdtsc();
-		multibit_rte_lpm6_lookup_bulk_func_prefetch(lpm, ip_batch, next_hops, vector_ips.size());
+		multibit_rte_lpm6_lookup_bulk_func_prefetch(lpm, ip_batch, next_hops, batch_size);
+		iterations++;
 		total_time += rte_rdtsc() - begin;
-
-		for (j = 0; j < vector_ips.size(); j++)
-		    if (next_hops[j] != vector_ips[j].next_hop)
-				count++;
+		//std::cout << "current time: " <<  (double)total_time / (double)batch_size<<"\n";
+		big_time+=total_time / batch_size;
+		for (int k = 0; k < batch_size; k++)
+		    if (next_hops[k] != expect_next_hops[k])
+			count++;
+	    }
+	    statistic.push_back({"FX_PREFETCH_" + name, ((double)big_time / (double)iterations)});
+	    std::cout << " Stop dataset: " << statistic.back().first << ' ' << statistic.back().second <<" fails: "<< count << '\n' ;
 	}
-	printf("BULK Prefetch LPM Lookup: %.1f cycles (fails = %.1f%%)\n",
-	       (double)total_time / ((double)ITERATIONS * vector_ips.size()),
-	       (count * 100.0) / (double)(ITERATIONS * vector_ips.size()));
 
-	/* Measure bulk Lookup */
-	total_time = 0;
-	count = 0;
-
-	memset(next_hops, 0, sizeof(next_hops));
-	for (i = 0; i < ITERATIONS; i ++) {
-		/* Lookup per batch */
+	for(auto &[name, lookup_ip]: vector_ips)
+	{
+	    static constexpr int batch_size = 1024;
+	    uint8_t ip_batch[batch_size][16];
+	    int32_t next_hops[batch_size];
+	    int32_t expect_next_hops[batch_size];
+	    int iterations = 0;
+	    count = 0;
+	    uint64_t big_time = 0;
+            for(int i =0; i < lookup_ip.size();)
+	    {
+		//collect ip in batch_array
+		for(int j =0; j < batch_size; j++)
+		{
+		    if (i > lookup_ip.size())
+			break;
+		    memcpy(ip_batch[j], lookup_ip[i].ip, RTE_LPM6_IPV6_ADDR_SIZE);
+		    expect_next_hops[j] = lookup_ip[i].next_hop;
+		    i++;
+		}
+		memset(next_hops,0, sizeof(next_hops));
+		total_time = 0;
 		begin = rte_rdtsc();
-		multibit_rte_lpm6_lookup_bulk_func_cache(lpm, ip_batch, next_hops, vector_ips.size());
+		multibit_rte_lpm6_lookup_bulk_func_cache(lpm, ip_batch, next_hops, batch_size);
+		iterations++;
 		total_time += rte_rdtsc() - begin;
-
-		for (j = 0; j < vector_ips.size(); j++)
-		    if (next_hops[j] != vector_ips[j].next_hop)
-				count++;
+		//std::cout << "current time: " <<  (double)total_time / (double)batch_size<<"\n";
+		big_time+=total_time / batch_size;
+		for (int k = 0; k < batch_size; k++)
+		    if (next_hops[k] != expect_next_hops[k])
+			count++;
+	    }
+	    statistic.push_back({"FX_CACHE_" + name, ((double)big_time / (double)iterations)});
+	    std::cout << " Stop dataset: " << statistic.back().first << ' ' << statistic.back().second <<" fails: "<< count << '\n' ;
 	}
-	printf("BULK Cache LPM Lookup: %.1f cycles (fails = %.1f%%)\n",
-	       (double)total_time / ((double)ITERATIONS * vector_ips.size()),
-	       (count * 100.0) / (double)(ITERATIONS * vector_ips.size()));
 
 	/* Delete */
 	status = 0;
@@ -563,15 +587,14 @@ tests_fib6_perf(std::vector<rules_tbl_entry> &vector_rules, std::vector<ips_tbl_
 
 	conf.type = RTE_FIB6_TRIE;
 	conf.default_nh = 0;
-	conf.max_routes = 20000;
+	conf.max_routes = 1000000;
 	conf.rib_ext_sz = 0;
 	conf.trie.nh_sz = RTE_FIB6_TRIE_4B;
-	conf.trie.num_tbl8 = RTE_MIN(get_max_nh(conf.trie.nh_sz), 2000U);
+	conf.trie.num_tbl8 = RTE_MIN(get_max_nh(conf.trie.nh_sz), 100000U);
 
-	rte_srand(rte_rdtsc());
 	fib = rte_fib6_create(__func__, SOCKET_ID_ANY, &conf);
 	TEST_FIB_ASSERT(fib != NULL);
-
+	std::cout  << " entires " << vector_rules.size() << " " << vector_ips.size()<<'\n';
 	begin = rte_rdtsc();
 	for (i =0; i < vector_rules.size(); i++) {
 	    if (rte_fib6_add(fib, vector_rules[i].ip,
@@ -590,10 +613,12 @@ tests_fib6_perf(std::vector<rules_tbl_entry> &vector_rules, std::vector<ips_tbl_
 
 	uint8_t ip_batch[vector_ips.size()][16];
 	int64_t next_hops[vector_ips.size()];
-
+	memset(next_hops, 1, vector_ips.size());
 	for (i = 0; i < vector_ips.size();i++)
 	{
 	    memcpy(ip_batch[i],   vector_ips[i].ip, 16);
+	    if(i %16 == 0)
+		vector_ips[i].next_hop = 13;
 	    //memcpy(ip_batch[i+2],   large_ips_table[j].ip, 16);
 	}
 
@@ -611,10 +636,10 @@ tests_fib6_perf(std::vector<rules_tbl_entry> &vector_rules, std::vector<ips_tbl_
 		    if (next_hops[j] != vector_ips[j].next_hop)
 				count++;
 	}
-	printf("BULK LPM Lookup: %.1f cycles (fails = %.1f%%)\n",
-	       (double)total_time / ((double)ITERATIONS * vector_ips.size()),
+	printf("BULK LPM Lookup POO: %.1f cycles (fails = %.1f%%)\n",
+	       (double)total_time / ((double)200000 * vector_ips.size()),
 	       (count * 100.0) / (double)(ITERATIONS * vector_ips.size()));
-
+	std::cout <<"fail: "<< count;
 	/* Delete */
 	status = 0;
 	begin = rte_rdtsc();

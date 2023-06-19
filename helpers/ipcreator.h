@@ -282,44 +282,66 @@ static void generate_long_ip_table_vec(std::vector<PREFIX> &vec, int num, char a
 }
 #include <cmath>
 template <typename PREFIX>
-static void generate_long_ip_table_vec(std::vector<PREFIX> &vec, int num, char average_len, char second_len =0)
+static void generate_long_ip_table_vec(std::vector<PREFIX> &vec, int num, char average_len, char second_len =0, char third_len = 0)
 {
     for(int i = 0; i < num; i++)
     {
 	PREFIX rule;
 	for(int j =0; j < 16; j++)
 	{
-	    rule.ip[j] = rte_rand();
+	    rule.ip[j] = rte_rand_max(256);
 	}
-	auto temp = rte_rand();
-	rule.depth = temp % 128;
-	if(average_len!=0)
+	auto temp = rte_rand_max(129);
+	rule.depth = temp ;
+	auto dep = rte_rand_max(6);
+	switch(dep)
 	{
-	    if(rule.depth % 5 == 0)
-	    {
-		if(second_len !=0)
-		{
-		    if(rule.depth %10 == 0)
-		    {
-			rule.depth = second_len;
-		    }
-		    else
-			rule.depth = average_len;
-		}
-		else
-		    rule.depth = average_len;
-	    }
+	case 1:
+	    rule.depth = average_len;
+	    break;
+	case 2:
+	    rule.depth = second_len;
+	    break;
+	case 3:
+	    rule.depth = third_len;
+	    break;
+	default:
+	    break;
 	}
 	vec.push_back(rule);
+    }
+}
+template <typename PREFIX>
+static void set_new_mask_ip_table_vec(std::vector<PREFIX> &vec, int num, uint8_t average_len, uint8_t second_len =0, uint8_t third_len = 0)
+{
+    for(int i =0; i < vec.size();i++)
+    {
+	vec[i].depth = rte_rand_max(129);
+	auto dep = rte_rand_max(6);
+	switch(dep)
+	{
+	case 1:
+	    vec[i].depth = average_len;
+	    break;
+	case 2:
+	    vec[i].depth = second_len;
+	    break;
+	case 3:
+	    vec[i].depth = third_len;
+	    break;
+	default:
+	    break;
+	}
     }
 }
 
 template <typename PREFIX, typename IPS>
 static void generate_large_ips_table_vec(const std::vector<PREFIX> &from,
-					 std::vector<IPS> &to, int ips_size,  int reps_number, int pace)
+					 std::vector<IPS> &to, int ips_size,  int reps_number, int pace, int failure_pace = 0)
 {
 
     int current_pace = pace;
+    int current_fail = failure_pace;
     for(int i =0, from_index =0; i< ips_size;i++)
     {
 	if(from_index >= from.size())
@@ -327,7 +349,7 @@ static void generate_large_ips_table_vec(const std::vector<PREFIX> &from,
 
 	IPS ips;
 	for(int j =0; j < 16; j++)
-	    ips.ip[j] = lrand48();
+	    ips.ip[j] = rte_rand_max(256);
 
 	mask_ip6_prefix(ips.ip,
 			from[from_index].ip, from[from_index].depth);
@@ -336,17 +358,19 @@ static void generate_large_ips_table_vec(const std::vector<PREFIX> &from,
 	{
 	    for(int f =0; f < reps_number; f++)
 	    {
-		std::cout <<"pace create\n";
+		//std::cout <<"pace create\n";
 		to.push_back(ips);
 
 	    }
 	    current_pace = 0;
 	    continue;
 	}
-	std::cout <<"pace increment\n";
+	//std::cout <<"pace increment\n";
 	to.push_back(ips);
 	current_pace++;
+	//if(failure_pace)
     }
+    to.push_back({});
 }
 
 static void
@@ -361,7 +385,7 @@ print_route_distribution(const struct rules_tbl_entry *table, uint32_t n)
 	/* Count depths. */
 	for (i = 1; i <= 128; i++) {
 		unsigned int depth_counter = 0;
-		double percent_hits;
+		double percent_hits =0 ;
 
 		for (j = 0; j < n; j++)
 			if (table[j].depth == (uint8_t) i)

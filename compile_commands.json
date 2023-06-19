@@ -1,20 +1,105 @@
 [
   {
     "arguments": [
-      "/usr/bin/g++",
+      "/usr/bin/g++-11",
       "-c",
-      "-g",
-      "-std=gnu++2b",
       "-DLOG_DEBUG",
+      "-Wl,--as-needed",
+      "-fpermissive",
+      "-march=native",
+      "-I./helpers",
+      "-g",
+      "-O2",
+      "-o",
+      "lpm6.o",
+      "tries/OMAR_dpdk_lpm6.c"
+    ],
+    "directory": "/home/omar/some_shit/some_tries",
+    "file": "/home/omar/some_shit/some_tries/tries/OMAR_dpdk_lpm6.c",
+    "output": "/home/omar/some_shit/some_tries/lpm6.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/g++-11",
+      "-c",
+      "-Wl,--as-needed",
+      "-fpermissive",
+      "-march=native",
+      "-g",
+      "-O2",
+      "-o",
+      "trie.o",
+      "tries/fib6/trie.c"
+    ],
+    "directory": "/home/omar/some_shit/some_tries",
+    "file": "/home/omar/some_shit/some_tries/tries/fib6/trie.c",
+    "output": "/home/omar/some_shit/some_tries/trie.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/g++-11",
+      "-c",
+      "-Wl,--as-needed",
+      "-fpermissive",
+      "-march=native",
+      "-I./helpers",
+      "-g",
+      "-O2",
+      "-fsanitize=undefined",
+      "-o",
+      "fib6.o",
+      "tries/fib6/OMAR_dpdk_fib6.c"
+    ],
+    "directory": "/home/omar/some_shit/some_tries",
+    "file": "/home/omar/some_shit/some_tries/tries/fib6/OMAR_dpdk_fib6.c",
+    "output": "/home/omar/some_shit/some_tries/fib6.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/g++-11",
+      "-c",
+      "-DLOG_DEBUG",
+      "-Wl,--as-needed",
+      "-fpermissive",
+      "-march=native",
+      "-I./helpers",
+      "-g",
+      "-O2",
+      "-o",
+      "multibit.o",
+      "tries/multibit_dpdk.c"
+    ],
+    "directory": "/home/omar/some_shit/some_tries",
+    "file": "/home/omar/some_shit/some_tries/tries/multibit_dpdk.c",
+    "output": "/home/omar/some_shit/some_tries/multibit.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/g++-11",
+      "-c",
+      "-std=gnu++2b",
+      "-DRTE_MAX_LCORE=8",
+      "-DLOG_DEBUG",
+      "lpm6.o",
+      "multibit.o",
+      "trie.o",
+      "fib6.o",
       "-I./tries/",
       "-I./helpers/",
       "-I./test/",
+      "-I./test/fib6",
+      "-Wl,--as-needed",
+      "-fpermissive",
+      "-march=native",
+      "-g",
+      "-O2",
+      "-fsanitize=undefined",
       "-o",
       "main",
       "main.cpp"
     ],
-    "directory": "/home/omar/some_shit/tries",
-    "file": "/home/omar/some_shit/tries/main.cpp",
-    "output": "/home/omar/some_shit/tries/main"
+    "directory": "/home/omar/some_shit/some_tries",
+    "file": "/home/omar/some_shit/some_tries/main.cpp",
+    "output": "/home/omar/some_shit/some_tries/main"
   }
 ]

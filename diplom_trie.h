@@ -1,6 +1,216 @@
 /* SPDX-License-Identifier: BSD-3-Clause
  * Copyright(c) 2010-2014 Intel Corporation
  */
+#ifndef _MULTIBITRTE_LPM6_H_
+#define _MULTIBITRTE_LPM6_H_
+
+/**
+ * @file
+ * RTE Longest Prefix Match for IPv6 (LPM6)
+ */
+
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+#define RTE_LPM6_MAX_DEPTH               128
+#define RTE_LPM6_IPV6_ADDR_SIZE           16
+/** Max number of characters in LPM name. */
+#define RTE_LPM6_NAMESIZE                 32
+
+
+/** LPM structure. */
+struct multibit_rte_lpm6;
+
+/** LPM configuration structure. */
+struct fx_trie_config {
+	uint32_t max_rules;      /**< Max number of rules. */
+	uint32_t number_tbl8s;   /**< Number of tbl8s to allocate. */
+	int flags;               /**< This field is currently unused. */
+};
+
+/**
+ * Create an LPM object.
+ *
+ * @param name
+ *   LPM object name
+ * @param socket_id
+ *   NUMA socket ID for LPM table memory allocation
+ * @param config
+ *   Structure containing the configuration
+ * @return
+ *   Handle to LPM object on success, NULL otherwise with rte_errno set
+ *   to an appropriate values. Possible rte_errno values include:
+ *    - E_RTE_NO_CONFIG - function could not get pointer to rte_config structure
+ *    - E_RTE_SECONDARY - function was called from a secondary process instance
+ *    - EINVAL - invalid parameter passed to function
+ *    - ENOSPC - the maximum number of memzones has already been allocated
+ *    - EEXIST - a memzone with the same name already exists
+ *    - ENOMEM - no appropriate memory area found in which to create memzone
+ */
+struct multibit_rte_lpm6 *
+multibit_rte_lpm6_create(const char *name, int socket_id,
+		const struct fx_trie_config *config);
+
+
+/**
+ * Free an LPM object.
+ *
+ * @param lpm
+ *   LPM object handle
+ *   If lpm is NULL, no operation is performed.
+ */
+void
+multibit_rte_lpm6_free(struct multibit_rte_lpm6 *lpm);
+
+/**
+ * Add a rule to the LPM table.
+ *
+ * @param lpm
+ *   LPM object handle
+ * @param ip
+ *   IP of the rule to be added to the LPM table
+ * @param depth
+ *   Depth of the rule to be added to the LPM table
+ * @param next_hop
+ *   Next hop of the rule to be added to the LPM table
+ * @return
+ *   0 on success, negative value otherwise
+ */
+int
+multibit_rte_lpm6_add(struct multibit_rte_lpm6 *lpm, const uint8_t *ip, uint8_t depth,
+	     uint32_t next_hop);
+
+/**
+ * Check if a rule is present in the LPM table,
+ * and provide its next hop if it is.
+ *
+ * @param lpm
+ *   LPM object handle
+ * @param ip
+ *   IP of the rule to be searched
+ * @param depth
+ *   Depth of the rule to searched
+ * @param next_hop
+ *   Next hop of the rule (valid only if it is found)
+ * @return
+ *   1 if the rule exists, 0 if it does not, a negative value on failure
+ */
+int
+multibit_rte_lpm6_is_rule_present(struct multibit_rte_lpm6 *lpm, const uint8_t *ip, uint8_t depth,
+			 uint32_t *next_hop);
+
+/**
+ * Delete a rule from the LPM table.
+ *
+ * @param lpm
+ *   LPM object handle
+ * @param ip
+ *   IP of the rule to be deleted from the LPM table
+ * @param depth
+ *   Depth of the rule to be deleted from the LPM table
+ * @return
+ *   0 on success, negative value otherwise
+ */
+int
+multibit_rte_lpm6_delete(struct multibit_rte_lpm6 *lpm, const uint8_t *ip, uint8_t depth);
+
+/**
+ * Delete a rule from the LPM table.
+ *
+ * @param lpm
+ *   LPM object handle
+ * @param ips
+ *   Array of IPs to be deleted from the LPM table
+ * @param depths
+ *   Array of depths of the rules to be deleted from the LPM table
+ * @param n
+ *   Number of rules to be deleted from the LPM table
+ * @return
+ *   0 on success, negative value otherwise.
+ */
+int
+multibit_rte_lpm6_delete_bulk_func(struct multibit_rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE], uint8_t *depths, unsigned n);
+
+/**
+ * Delete all rules from the LPM table.
+ *
+ * @param lpm
+ *   LPM object handle
+ */
+void
+multibit_rte_lpm6_delete_all(struct multibit_rte_lpm6 *lpm);
+
+/**
+ * Lookup an IP into the LPM table.
+ *
+ * @param lpm
+ *   LPM object handle
+ * @param ip
+ *   IP to be looked up in the LPM table
+ * @param next_hop
+ *   Next hop of the most specific rule found for IP (valid on lookup hit only)
+ * @return
+ *   -EINVAL for incorrect arguments, -ENOENT on lookup miss, 0 on lookup hit
+ */
+int
+multibit_rte_lpm6_lookup(const struct multibit_rte_lpm6 *lpm, const uint8_t *ip, uint32_t *next_hop);
+
+/**
+ * Lookup multiple IP addresses in an LPM table.
+ *
+ * @param lpm
+ *   LPM object handle
+ * @param ips
+ *   Array of IPs to be looked up in the LPM table
+ * @param next_hops
+ *   Next hop of the most specific rule found for IP (valid on lookup hit only).
+ *   This is an array of two byte values. The next hop will be stored on
+ *   each position on success; otherwise the position will be set to -1.
+ * @param n
+ *   Number of elements in ips (and next_hops) array to lookup.
+ *  @return
+ *   -EINVAL for incorrect arguments, otherwise 0
+ */
+
+int
+multibit_rte_lpm6_lookup_bulk_func(const struct multibit_rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+				   int32_t *next_hops, unsigned int n);
+
+int
+multibit_rte_lpm6_lookup_bulk_func_branch(const struct multibit_rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+				   int32_t *next_hops, unsigned int n);
+
+int
+multibit_rte_lpm6_lookup_bulk_func_prefetch(const struct multibit_rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+				   int32_t *next_hops, unsigned int n);
+
+int
+multibit_rte_lpm6_lookup_bulk_func_branch_plus_prefetch(const struct multibit_rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+				   int32_t *next_hops, unsigned int n);
+
+int
+multibit_rte_lpm6_lookup_bulk_func_cache(const struct multibit_rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+				   int32_t *next_hops, unsigned int n);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
+
+/* SPDX-License-Identifier: BSD-3-Clause
+ * Copyright(c) 2010-2014 Intel Corporation
+ */
 #include <string.h>
 #include <stdint.h>
 #include <errno.h>
@@ -245,7 +455,7 @@ rebuild_lpm(struct multibit_rte_lpm6 *lpm)
  */
 struct multibit_rte_lpm6 *
 multibit_rte_lpm6_create(const char *name, int socket_id,
-		const struct multibit_rte_lpm6_config *config)
+		const struct fx_trie_config *config)
 {
 	char mem_name[RTE_LPM6_NAMESIZE];
 	struct multibit_rte_lpm6 *lpm = NULL;
@@ -1085,26 +1295,26 @@ multibit_rte_lpm6_lookup_bulk_func_prefetch(const struct multibit_rte_lpm6 *lpm,
 		first_byte = LOOKUP_FIRST_BYTE;
 		tbl24_index = ips[i][0]; /* (ips[i][0] << BYTES2_SIZE) | */
 				/* (ips[i][1] << BYTE_SIZE) | ips[i][2]; */
-		rte_prefetch2(&lpm->tbl24[ips[i+1][0]]);
+
 		/* Calculate pointer to the first entry to be inspected */
 		tbl = &lpm->tbl24[tbl24_index];
 		do {
 
-		    /* { */
-		    /* 	uint32_t tbl8_index, tbl_entry; */
+		    {
+			uint32_t tbl8_index, tbl_entry;
 
-		    /* 	/\* Take the integer value from the pointer. *\/ */
-		    /* 	tbl_entry = *(const uint32_t *)tbl; */
+			/* Take the integer value from the pointer. */
+			tbl_entry = *(const uint32_t *)tbl;
 
-		    /* /\* If it is valid and extended we calculate the new pointer to return. *\/ */
+		    /* If it is valid and extended we calculate the new pointer to return. */
 
-		    /* 	tbl8_index = ips[i][first_byte+1] + */
-		    /* 	    ((tbl_entry & RTE_LPM6_TBL8_BITMASK) * */
-		    /* 	     RTE_LPM6_TBL8_GROUP_NUM_ENTRIES); */
-		    /* 	prefetch_tbl_next = &lpm->tbl8[tbl8_index]; */
+			tbl8_index = ips[i][first_byte+1] +
+			    ((tbl_entry & RTE_LPM6_TBL8_BITMASK) *
+			     RTE_LPM6_TBL8_GROUP_NUM_ENTRIES);
+			prefetch_tbl_next = &lpm->tbl8[tbl8_index];
 
-		    /* 	rte_prefetch2(prefetch_tbl_next); */
-		    /* } */
+			rte_prefetch2(prefetch_tbl_next);
+		    }
 			/* Continue inspecting following levels
 			 * until success or failure
 			 */
@@ -1551,3 +1761,4 @@ multibit_rte_lpm6_delete(struct multibit_rte_lpm6 *lpm, const uint8_t *ip, uint8
 
 	return 0;
 }
+
